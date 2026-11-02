@@ -80,13 +80,20 @@ export default function HowItWorksPage() {
             </table>
           </>
         )}
-        <p>Check where you stand on the <Link to="/leaderboard">leaderboard</Link>: overall, and for PvM, Skilling and Special.</p>
+        <p>Check where you stand on the <Link to="/leaderboard">leaderboard</Link>: overall, and for PvM, Skilling and Special. When the event ends, the <Link to="/results">results</Link> page crowns the podium and the category champions.</p>
       </Section>
 
       <Section title="Most Wanted">
         <p>
           Below the main board are the Most Wanted bounties: tougher jobs for proven hunters. Anyone can see them, but you need a
           certain amount of reputation (shown on each poster) before you can claim one. Bonus reputation counts.
+        </p>
+      </Section>
+
+      <Section title="The Tavern">
+        <p>
+          The <Link to="/tavern">Tavern</Link> is the event's chat. Brag about your kills, plot against the leaders, and trash-talk
+          your rivals. Keep it fun: no slurs and nothing personal. Admins can delete messages and mute anyone who takes it too far.
         </p>
       </Section>
 

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, must } from './supabase';
 import type {
-  ArchiveRow, BoardSlot, Category, Contract, EventSettings, HunterProfile, LeaderboardRow, PlayerSummary, Rank, Submission,
+  ActivityRow, ArchiveRow, BoardSlot, EventStats, Category, Contract, EventSettings, HunterProfile, LeaderboardRow, PlayerSummary, Rank, Submission,
 } from './types';
 
 export function useSettings() {
@@ -37,8 +37,10 @@ export function useBoardRealtime() {
       .channel('board-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_slots' }, () =>
         qc.invalidateQueries({ queryKey: ['board'] }))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, () =>
-        qc.invalidateQueries({ queryKey: ['board'] }))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, () => {
+        qc.invalidateQueries({ queryKey: ['board'] });
+        qc.invalidateQueries({ queryKey: ['activity'] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
@@ -107,4 +109,32 @@ export function useUnseenReviews(uid: string | undefined) {
     refetchInterval: 60_000,
     queryFn: async () => Number(must(await supabase.rpc('my_unseen_reviews')) ?? 0),
   });
+}
+
+export function useActivity(limit = 15) {
+  return useQuery({
+    queryKey: ['activity', limit],
+    queryFn: async () => must(await supabase.rpc('get_activity', { p_limit: limit })) as ActivityRow[],
+    refetchInterval: 45_000,
+  });
+}
+
+export function useEventStats() {
+  return useQuery({
+    queryKey: ['event-stats'],
+    queryFn: async () => must(await supabase.rpc('get_event_stats')) as EventStats,
+    refetchInterval: 120_000,
+  });
+}
+
+/** Where the event is right now, re-checked every 30 seconds. */
+export function useEventPhase() {
+  const settings = useSettings().data;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(t); }, []);
+  if (!settings) return { settings, phase: 'loading' as const };
+  const phase = now < new Date(settings.starts_at).getTime() ? 'before' as const
+    : now > new Date(settings.ends_at).getTime() ? 'ended' as const
+    : settings.is_paused ? 'paused' as const : 'live' as const;
+  return { settings, phase };
 }

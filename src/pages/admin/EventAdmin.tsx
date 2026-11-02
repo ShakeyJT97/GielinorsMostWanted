@@ -4,6 +4,7 @@ import { Loading, Notice } from '../../components/ui';
 import { useRanks, useSettings } from '../../lib/queries';
 import { errorMessage, must, supabase } from '../../lib/supabase';
 import { fmtDateTime, fromLocalInput, toLocalInput } from '../../lib/format';
+import { downloadCsv, fetchAll, stamp, toCsv } from '../../lib/csv';
 import type { AuditRow, EventSettings, IntegrationSettings, Rank } from '../../lib/types';
 
 export function EventAdmin() {
@@ -75,6 +76,7 @@ export function EventAdmin() {
         </form>
       </section>
 
+      <BackupDownloads />
       <JoinCodeSettings />
       <DiscordSettings />
       <RanksEditor />
@@ -89,6 +91,65 @@ function Num({ id, label, value, min, max, onChange, hint }: { id: string; label
       <input id={id} type="number" className="field" min={min} max={max} required value={value} onChange={(e) => onChange(Number(e.target.value))} />
       {hint && <p className="hint">{hint}</p>}
     </div>
+  );
+}
+
+function BackupDownloads() {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  async function run(kind: 'claims' | 'reputation' | 'players') {
+    setBusy(kind); setMsg(null);
+    try {
+      const players = await fetchAll('profiles', 'id, rs_name, role, is_banned, is_muted, created_at', 'created_at');
+      const nameOf = new Map(players.map((p) => [p.id as string, p.rs_name as string | null]));
+      if (kind === 'claims') {
+        const rows = await fetchAll('submissions', '*, contract:contracts(title, category, reputation)', 'submitted_at');
+        const flat = rows.map((r) => {
+          const c = r.contract as { title: string; category: string; reputation: number } | null;
+          return { ...r, player: nameOf.get(r.player_id as string), reviewer: nameOf.get(r.reviewed_by as string),
+                   bounty: c?.title, category: c?.category, bounty_reputation: c?.reputation,
+                   screenshots: (r.evidence_files as string[]).length };
+        });
+        downloadCsv(`gmw-claims-${stamp()}.csv`, toCsv(flat, [['submitted_at', 'Submitted'], ['player', 'Player'], ['bounty', 'Bounty'], ['category', 'Category'],
+          ['bounty_reputation', 'Reward'], ['status', 'Status'], ['reviewed_at', 'Reviewed'], ['reviewer', 'Reviewed by'], ['review_note', 'Admin note'],
+          ['player_note', 'Player note'], ['evidence_links', 'Links'], ['screenshots', 'Screenshots'], ['id', 'Claim ID']]));
+        setMsg({ tone: 'success', text: `Downloaded ${flat.length} claims.` });
+      } else if (kind === 'reputation') {
+        const rows = await fetchAll('reputation_events', '*, contract:contracts(title)', 'created_at');
+        const flat = rows.map((r) => ({ ...r, player: nameOf.get(r.player_id as string), by: nameOf.get(r.created_by as string),
+                                        bounty: (r.contract as { title: string } | null)?.title }));
+        downloadCsv(`gmw-reputation-${stamp()}.csv`, toCsv(flat, [['created_at', 'When'], ['player', 'Player'], ['amount', 'Amount'], ['source', 'Type'],
+          ['category', 'Category'], ['bounty', 'Bounty'], ['reason', 'Reason'], ['by', 'Given by']]));
+        setMsg({ tone: 'success', text: `Downloaded ${flat.length} reputation entries.` });
+      } else {
+        const { data, error } = await supabase.rpc('get_leaderboard', { p_category: null });
+        if (error) throw error;
+        const standing = new Map(((data ?? []) as { player_id: string; place: number; reputation: number; claims: number; rank_name: string }[]).map((r) => [r.player_id, r]));
+        const flat = players.filter((p) => p.rs_name).map((p) => ({ ...p, ...(standing.get(p.id as string) ?? { reputation: 0, claims: 0 }) }));
+        flat.sort((a, b) => Number(b.reputation) - Number(a.reputation));
+        downloadCsv(`gmw-players-${stamp()}.csv`, toCsv(flat, [['place', 'Place'], ['rs_name', 'Player'], ['reputation', 'Reputation'], ['claims', 'Bounties'],
+          ['rank_name', 'Rank'], ['role', 'Role'], ['is_banned', 'Banned'], ['is_muted', 'Muted'], ['created_at', 'Joined']]));
+        setMsg({ tone: 'success', text: `Downloaded ${flat.length} players.` });
+      }
+    } catch (e) {
+      setMsg({ tone: 'error', text: errorMessage(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="font-display text-xl text-ink">Backups</h2>
+      <p className="mb-3 text-ink-soft">Download spreadsheets (CSV, opens in Excel or Google Sheets). Worth doing every few days during the event.</p>
+      {msg && <div className="mb-3"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
+      <div className="flex flex-wrap gap-2">
+        <button className="btn btn-ghost" disabled={!!busy} onClick={() => run('claims')}>{busy === 'claims' ? 'Preparing…' : 'Download claims'}</button>
+        <button className="btn btn-ghost" disabled={!!busy} onClick={() => run('reputation')}>{busy === 'reputation' ? 'Preparing…' : 'Download reputation'}</button>
+        <button className="btn btn-ghost" disabled={!!busy} onClick={() => run('players')}>{busy === 'players' ? 'Preparing…' : 'Download players and standings'}</button>
+      </div>
+    </section>
   );
 }
 
@@ -141,6 +202,7 @@ function DiscordSettings() {
         notify_retirements: f!.notify_retirements,
         notify_new_bounties: f!.notify_new_bounties,
         site_url: f!.site_url?.trim() || null,
+        daily_post_hour: f!.daily_post_hour,
       }).eq('id', true);
       if (error) throw error;
     },
@@ -150,6 +212,11 @@ function DiscordSettings() {
   const test = useMutation({
     mutationFn: async () => { const { error } = await supabase.rpc('send_discord_test'); if (error) throw error; },
     onSuccess: () => setMsg({ tone: 'success', text: 'Test message sent. If it doesn\'t appear in Discord within a minute, check the webhook address.' }),
+    onError: (e) => setMsg({ tone: 'error', text: errorMessage(e) }),
+  });
+  const standings = useMutation({
+    mutationFn: async () => { const { error } = await supabase.rpc('send_standings_now'); if (error) throw error; },
+    onSuccess: () => setMsg({ tone: 'success', text: 'Current standings posted to Discord.' }),
     onError: (e) => setMsg({ tone: 'error', text: errorMessage(e) }),
   });
 
@@ -186,9 +253,20 @@ function DiscordSettings() {
           {toggle('notify_retirements', 'A bounty is fully claimed')}
           {toggle('notify_new_bounties', 'A new bounty goes up')}
         </fieldset>
+        <div>
+          <label className="label" htmlFor="daily">Daily standings</label>
+          <select id="daily" className="field !w-auto" value={f.daily_post_hour ?? ''}
+            onChange={(e) => setF({ ...f, daily_post_hour: e.target.value === '' ? null : Number(e.target.value) })}>
+            <option value="">Off</option>
+            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>Every day at {String(h).padStart(2, '0')}:00 (UK time)</option>)}
+          </select>
+          <p className="hint">Posts the top 5 once a day while the event runs, and the final standings when it ends.
+            {f.last_daily_post_on && ` Last posted ${f.last_daily_post_on}.`}</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-wax" disabled={save.isPending}>Save Discord settings</button>
           <button type="button" className="btn btn-ghost" disabled={test.isPending || !q.data?.discord_webhook_url} onClick={() => test.mutate()}>Send test message</button>
+          <button type="button" className="btn btn-ghost" disabled={standings.isPending || !q.data?.discord_webhook_url} onClick={() => standings.mutate()}>Post standings now</button>
         </div>
       </form>
     </section>
@@ -243,7 +321,8 @@ const ACTION_LABEL: Record<string, string> = {
   'slot.manual_rotate': 'Manual rotation', 'slot.paused': 'Paused slot', 'slot.resumed': 'Resumed slot',
   'board.synced': 'Filled empty slots', 'event.settings_updated': 'Changed event settings',
   'reputation.bonus': 'Bonus reputation', 'reputation.adjustment': 'Reputation correction',
-  'player.role_set': 'Changed role', 'player.passphrase_reset': 'Reset passphrase', 'submission.entered_by_admin': 'Added claim from Discord', 'player.banned': 'Banned player', 'player.unbanned': 'Unbanned player',
+  'player.role_set': 'Changed role', 'player.passphrase_reset': 'Reset passphrase', 'submission.entered_by_admin': 'Added claim from Discord', 'submission.revoked': 'Revoked approval',
+  'chat.deleted': 'Deleted Tavern message', 'player.muted': 'Muted player', 'player.unmuted': 'Unmuted player', 'player.banned': 'Banned player', 'player.unbanned': 'Unbanned player',
 };
 
 export function AuditLog() {

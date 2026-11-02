@@ -233,6 +233,19 @@
   .table-ink td { @apply border-b border-ink/15 px-2 py-2 align-top; }
 }
 
+
+/* Category colours, matching the wax seals. Kept outside @layer so Tailwind doesn't strip
+   these: the class names are built at runtime (cat-box-${category}). */
+.cat-box { color: var(--cat); border-color: color-mix(in srgb, var(--cat) 75%, transparent);
+           background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--cat) 22%, transparent), color-mix(in srgb, var(--cat) 10%, transparent) 75%); }
+.cat-box-pvm, .cat-text-pvm { --cat: #8e1f1f; }
+.cat-box-skilling, .cat-text-skilling { --cat: #3e6a2d; }
+.cat-box-special, .cat-text-special { --cat: #3b3778; }
+.cat-text-pvm, .cat-text-skilling, .cat-text-special { color: var(--cat); }
+
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
 }
+
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } }

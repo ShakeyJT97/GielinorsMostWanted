@@ -17,6 +17,7 @@ export interface Profile {
   rs_name: string | null;
   role: Role;
   is_banned: boolean;
+  is_muted?: boolean;
   created_at: string;
 }
 
@@ -85,6 +86,7 @@ export interface BoardSlot {
   activated_at: string | null;
   claimants: string[];
   my_status: SubmissionStatus | null;
+  pending_count: number | null;
 }
 
 export interface Submission {
@@ -170,5 +172,38 @@ export interface IntegrationSettings {
   notify_new_bounties: boolean;
   site_url: string | null;
   join_code: string | null;
+  daily_post_hour: number | null;
+  last_daily_post_on: string | null;
+  final_posted: boolean;
   updated_at: string;
+}
+
+export interface ActivityRow {
+  at: string;
+  kind: 'claim' | 'retired' | 'posted';
+  player: string | null;
+  contract_id: string | null;
+  title: string | null;
+  reputation: number | null;
+}
+
+export interface ChatMessage {
+  id: number;
+  player_id: string;
+  rs_name: string;
+  rank_name: string | null;
+  is_admin: boolean;
+  body: string;
+  created_at: string;
+}
+
+export interface EventStats {
+  podium: LeaderboardRow[];
+  category_winners: Record<Category, LeaderboardRow[]>;
+  claims: number;
+  hunters: number;
+  reputation: number;
+  bounties_claimed: number;
+  fastest: { contract_id: string; title: string; category: Category; seconds: number } | null;
+  busiest: { contract_id: string; title: string; attempts: number } | null;
 }

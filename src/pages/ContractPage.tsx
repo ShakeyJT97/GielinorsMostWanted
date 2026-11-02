@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CategoryChip, Loading, Notice, Sheet, StatusChip } from '../components/ui';
 import { DifficultyMarks, WaxSeal } from '../components/board/Emblem';
 import { useAuth } from '../lib/auth';
-import { useBoard, useContract, useMySubmissions, usePlayerSummary, useSettings } from '../lib/queries';
+import { useBoard, useContract, useEventPhase, useMySubmissions, usePlayerSummary, useSettings } from '../lib/queries';
+import { fmtDateTime as fmtWhen } from '../lib/format';
 import { HunterLink } from './HunterPage';
 import { errorMessage, supabase } from '../lib/supabase';
 import { EvidenceInputs, uploadEvidence, useEvidence } from '../components/EvidenceInputs';
@@ -20,6 +21,7 @@ export default function ContractPage() {
   const mySubs = useMySubmissions(session?.user.id).data?.filter((s) => s.contract_id === id) ?? [];
   const settings = useSettings().data;
   const myRep = Number(usePlayerSummary(session?.user.id).data?.reputation ?? 0);
+  const { phase } = useEventPhase();
 
   if (contractQ.isLoading) return <Sheet><Loading /></Sheet>;
   const c = contractQ.data;
@@ -89,6 +91,21 @@ export default function ContractPage() {
             <>
               <h2 className="font-sc text-lg font-bold">Your claim</h2>
               <ClaimRow sub={open} />
+            </>
+          ) : live && phase === 'before' && settings ? (
+            <>
+              <h2 className="font-sc text-lg font-bold">Not open yet</h2>
+              <p className="mt-1">Claims open {fmtWhen(settings.starts_at)}. Get it done in game after that, then come back with your screenshots.</p>
+            </>
+          ) : live && phase === 'ended' ? (
+            <>
+              <h2 className="font-sc text-lg font-bold">The hunt is over</h2>
+              <p className="mt-1">Claims closed when the event ended. <Link to="/results">See the results</Link>.</p>
+            </>
+          ) : live && phase === 'paused' ? (
+            <>
+              <h2 className="font-sc text-lg font-bold">Event paused</h2>
+              <p className="mt-1">The admins have paused new claims for now. Keep your screenshots; you can submit when it resumes.</p>
             </>
           ) : live && c.min_reputation > myRep ? (
             <>

@@ -19,7 +19,7 @@ You'll need three free accounts: **Supabase** (database and sign-in), **GitHub**
    (It's the files in `supabase/migrations/`, then `seed.sql` and `seed_most_wanted.sql`, joined together in order. You can run them one by one instead if you prefer.)
 4. Go to **Table Editor → board_slots**: you should see 14 rows with contracts in them: 12 on the main board and 2 Most Wanted.
 
-**Already ran an earlier version?** Don't run `setup_all.sql` again. Run only the files you haven't run yet, in this order: `migrations/0004_profiles_wanted_discord.sql`, `seed_most_wanted.sql`, `migrations/0005_passphrase_login.sql`, `migrations/0006_admin_entry_and_review_alerts.sql`. Your existing board, claims and reputation are kept.
+**Already ran an earlier version?** Don't run `setup_all.sql` again. Run only the files you haven't run yet, in this order: `migrations/0004_profiles_wanted_discord.sql`, `seed_most_wanted.sql`, `migrations/0005_passphrase_login.sql`, `migrations/0006_admin_entry_and_review_alerts.sql`, `migrations/0007_tavern_results_and_admin_tools.sql`. Your existing board, claims and reputation are kept.
 
 ### 2. Set up sign-in
 
@@ -65,11 +65,14 @@ Optional: to stop people outside the clan registering, set a **join code** in **
 
 The site then posts when a claim is approved, when a bounty is fully claimed, and when a new bounty goes up. Posts can't ping @everyone. This uses Supabase's built-in `pg_net` extension, which the setup file turns on for you.
 
+**Daily standings:** in the same Discord section, pick an hour (UK time) to post the top 5 every day, plus the final standings when the event ends. This runs on Supabase's `pg_cron` scheduler, which the setup file also turns on. If the SQL Editor showed a notice that pg_cron wasn't available, enable **pg_cron** under **Database → Extensions** (or **Integrations → Cron**) and run `migrations/0007_tavern_results_and_admin_tools.sql` again; it's safe to re-run.
+
 ### 7. Before launch
 
 - **Admin → Event**: set the real start and end dates and a codeword. The seed uses placeholder dates (starting the moment you ran it, for 14 days).
 - **Admin → Contracts**: check each sample contract against the game, edit wording, add your own. The samples ask players to type the codeword in **clan chat**, so their name shows next to it.
 - Read the player-facing **How it works** page and adjust anything that doesn't match your rules (it's in `src/pages/HowItWorksPage.tsx`; dates, codeword, ranks and claim limits fill in automatically).
+- **Admin → Event → Backups**: download the claims, reputation and players spreadsheets every few days during the event.
 - Do a test run with a couple of clan members. To reset afterwards, see "Starting fresh" below.
 
 ---
@@ -95,6 +98,8 @@ The site then posts when a claim is approved, when a bounty is fully claimed, an
 | Sign-ups need a valid, unused RuneScape name (and the join code, if set) | Trigger on `auth.users` rejects the account otherwise |
 | Signing in never reveals a real email address | `login_email_for()` only returns placeholder logins |
 | Admins can enter claims for Discord-only players | `admin_submit_claim()`: same rules as a player's own claim, can be dated back to the Discord post, can be approved in the same step, and is logged |
+| Tavern posts go through checks | `post_chat()`: signed in, not banned or muted, 1–500 characters, no more than 4 messages in 15 seconds |
+| Revoked claims can't linger | `revoke_approval()` removes the award, recounts the bounty, and logs the reason |
 | Lost passphrase | Admin → Players → Reset passphrase: new one shown once, old one stops working, player signed out everywhere |
 
 **Slots fill on approval, not submission.** When a bounty fills, any pending claims on it close with no reputation. The review queue is sorted oldest first so the earliest valid claim normally gets the last slot.
@@ -104,6 +109,14 @@ The site then posts when a claim is approved, when a bounty is fully claimed, an
 **Guests** can browse everything without an account: the board, contract details, leaderboards, the archive and hunter profiles. Signing in is only needed to claim.
 
 **Passphrases** are five random words and a number (about 47 bits of randomness), generated in the browser. Supabase stores only a bcrypt hash and rate-limits sign-in attempts. Players can get a new passphrase any time from **My bounties**. A player who renames themselves signs in with the new name.
+
+**The Tavern** is the event chat. Anyone can read it; signed-in players can post (up to 500 characters, with a light limit on rapid posting). Players can delete their own messages; admins can delete anyone's and mute players (Tavern → Mute, or Admin → Players). New messages appear live.
+
+**Revoking an approval.** Approved by mistake? In **Admin → Review → Recently reviewed**, use **Revoke approval** and give a reason. The reputation is removed, the player sees the claim as rejected with your reason, and if the bounty is still up its slot frees again. If it had already retired, it stays in the archive.
+
+**Results.** When the event ends, a Results page appears in the menu: podium, category champions and event stats. It works during the event too, as "Standings so far".
+
+**Link previews.** Sharing the site link in Discord shows a card with the board image (`public/og-image.jpg`). On Vercel the site address is filled in automatically; elsewhere set `VITE_SITE_URL`.
 
 **Claims posted in Discord.** In **Admin → Add claim**, type the player's RuneScape name (or add them as a new player: an account is made with just their name), pick the bounty, save the screenshot from Discord and add it (or paste a copied image), set when they posted it, and choose whether to approve now or send it to the review queue. Discord's own image links expire, so upload the screenshot rather than linking to it.
 
@@ -121,14 +134,15 @@ cp .env.example .env.local   # fill in your Supabase URL and anon key
 npm run dev
 ```
 
-`npm run test:db` runs 122 checks of the game rules (claim limits, rotation, duplicate awards, Most Wanted gating, Discord posts, passphrase sign-up and resets, admin claim entry, review alerts, row-level security) against an in-memory Postgres.
+`npm run test:db` runs 166 checks of the game rules (claim limits, rotation, duplicate awards, Most Wanted gating, Discord posts, passphrase sign-up and resets, admin claim entry, review alerts, revoking, results, Tavern chat and moderation, daily standings, row-level security) against an in-memory Postgres.
 
 ## Starting fresh after a test run
 
 In the SQL Editor:
 
 ```sql
-truncate public.audit_log, public.reputation_events, public.submissions restart identity;
+truncate public.audit_log, public.reputation_events, public.submissions, public.chat_messages restart identity;
+update public.integration_settings set last_daily_post_on = null, final_posted = false;
 update public.board_slots set contract_id = null, state = 'awaiting';
 select set_config('gmw.internal', 'on', false);
 update public.contracts set status = 'pool', approved_count = 0, activated_at = null, retired_at = null
@@ -146,7 +160,7 @@ supabase/seed.sql      settings, ranks, 30 sample contracts
 supabase/seed_most_wanted.sql  4 sample Most Wanted contracts
 supabase/setup_all.sql everything above in one file
 src/components/board/  noticeboard, posters, wax seals, emblems
-src/pages/             board, contract, profiles, leaderboards, archive, how it works, sign-in
+src/pages/             board, contract, profiles, leaderboards, archive, results, Tavern, how it works, sign-in
 src/pages/admin/       review queue, add claim, board slots, contracts, players, event, audit log
 ```
 

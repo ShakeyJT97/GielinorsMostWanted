@@ -22,3 +22,20 @@ export function toLocalInput(iso: string): string {
 }
 
 export const fromLocalInput = (v: string) => new Date(v).toISOString();
+
+/** "3 min ago", "2 h ago", "yesterday", or a date. */
+export function ago(iso: string, now = Date.now()): string {
+  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  if (s < 45) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 172_800) return 'yesterday';
+  return fmtDay(iso);
+}
+
+export function duration(seconds: number): string {
+  const d = Math.floor(seconds / 86_400), h = Math.floor((seconds % 86_400) / 3600), m = Math.floor((seconds % 3600) / 60);
+  if (d) return `${d} day${d === 1 ? '' : 's'} ${h} h`;
+  if (h) return `${h} h ${m} min`;
+  return `${Math.max(1, m)} min`;
+}

@@ -54,11 +54,11 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
         <p className={`text-center font-display leading-none tracking-wider ${wanted ? 'text-[1.45rem] text-[#6d1414]' : 'text-[1.7rem] text-ink'}`}>
           {wanted ? 'Most Wanted' : 'Bounty'}
         </p>
-        <p className="mt-1 text-center font-sc text-sm font-bold text-ink-soft">
+        <p className={`mt-1 text-center font-sc text-sm font-bold cat-text-${slot.category}`}>
           {CATEGORY_LABEL[slot.category]} contract
         </p>
 
-        <div className={`relative mx-auto my-3 grid h-24 w-28 place-items-center border-[3px] border-double ${wanted ? 'border-[#6d1414]/70 text-[#3b1010]' : 'border-ink/60 text-ink/80'}`}>
+        <div className={`cat-box cat-box-${slot.category} relative mx-auto my-3 grid h-24 w-28 place-items-center border-[3px] border-double`}>
           <Emblem category={slot.category} className="h-16 w-16" />
           {locked && <Padlock />}
         </div>
@@ -95,6 +95,11 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
         <p className="mt-1 text-center text-sm text-ink-soft">
           {paused ? 'Paused by the admins' : remaining === 0 ? 'All claims taken' : `${remaining} of ${limit} claims left`}
         </p>
+        {!paused && remaining > 0 && (slot.pending_count ?? 0) > 0 && (
+          <p className={`text-center text-sm font-bold ${(slot.pending_count ?? 0) >= remaining ? 'text-[#7a1a1a]' : 'text-ink-soft'}`}>
+            {slot.pending_count} waiting for review
+          </p>
+        )}
         {mine && <p className="mt-1 text-center font-sc text-sm font-bold text-ink">{mine}</p>}
       </article>
       {stamped && (

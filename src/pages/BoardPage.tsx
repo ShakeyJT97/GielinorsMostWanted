@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Noticeboard } from '../components/board/Noticeboard';
+import { CategoryKey } from '../components/board/CategoryKey';
+import { ActivityTicker, Countdown } from '../components/board/BoardExtras';
+import { Emblem } from '../components/board/Emblem';
 import { Loading } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { useBoard, useBoardRealtime, usePlayerSummary, useSettings } from '../lib/queries';
@@ -23,6 +26,8 @@ function Lantern({ side }: { side: 'left' | 'right' }) {
   );
 }
 
+const hunters = (n: number) => `${['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'][n] ?? n} ${n === 1 ? 'hunter' : 'hunters'}`;
+
 export default function BoardPage() {
   const board = useBoard();
   useBoardRealtime();
@@ -31,11 +36,19 @@ export default function BoardPage() {
   const summary = usePlayerSummary(session?.user.id).data;
   const myRep = session ? Number(summary?.reputation ?? 0) : null;
   const [filter, setFilter] = useState<Category | 'all'>('all');
+  const [hideMine, setHideMine] = useState(() => {
+    try { return localStorage.getItem('gmw-hide-mine') === '1'; } catch { return false; }
+  });
+  function toggleHideMine() {
+    setHideMine((v) => { try { localStorage.setItem('gmw-hide-mine', v ? '0' : '1'); } catch { /* not saved */ } return !v; });
+  }
+  const isMine = (s: { my_status: string | null }) => s.my_status === 'approved' || s.my_status === 'pending';
 
   const slots = useMemo(
-    () => (board.data ?? []).filter((s) => s.tier === 'main' && (filter === 'all' || s.category === filter)),
-    [board.data, filter],
+    () => (board.data ?? []).filter((s) => s.tier === 'main' && (filter === 'all' || s.category === filter) && !(session && hideMine && isMine(s))),
+    [board.data, filter, hideMine, session],
   );
+  const hiddenCount = session && hideMine ? (board.data ?? []).filter((s) => s.tier === 'main' && (filter === 'all' || s.category === filter) && isMine(s)).length : 0;
   const wanted = useMemo(() => (board.data ?? []).filter((s) => s.tier === 'wanted'), [board.data]);
   const now = Date.now();
   const notStarted = settings && now < new Date(settings.starts_at).getTime();
@@ -47,15 +60,22 @@ export default function BoardPage() {
       <Lantern side="right" />
 
       <div className="sign">
-        <h1 className="carved font-display text-2xl leading-tight sm:text-4xl">Gielinor's Most Wanted</h1>
+        <h1 className="carved font-display text-2xl leading-tight sm:text-4xl">{settings?.event_name ?? "Gielinor's Most Wanted"}</h1>
         <p className="mt-0.5 font-sc text-sm font-bold text-parchment-200/90 sm:text-base">
           {settings ? (
             notStarted ? `Bounties open ${fmtDay(settings.starts_at)}`
               : ended ? 'The hunt is over'
-              : `${timeLeft(settings.ends_at)}. Five hunters per bounty.`
+              : `${timeLeft(settings.ends_at)}. ${hunters(settings.default_claim_limit)} per bounty.`
           ) : 'Posted by the UwU Girls'}
         </p>
       </div>
+
+      {settings && notStarted && <Countdown settings={settings} />}
+      {settings && ended && (
+        <p className="mx-auto mt-5 w-fit rounded bg-oak-950/70 px-4 py-2 text-center text-parchment-100">
+          The final bounty has been called. <Link to="/results" className="font-bold text-brass underline underline-offset-2">See the results</Link>
+        </p>
+      )}
 
       <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-2" role="group" aria-label="Filter contracts">
         {(['all', ...CATEGORIES] as const).map((c) => (
@@ -67,10 +87,23 @@ export default function BoardPage() {
               filter === c ? 'bg-parchment-100 text-ink' : 'bg-oak-900/70 text-parchment-100 hover:bg-oak-900'
             }`}
           >
-            {c === 'all' ? 'All bounties' : CATEGORY_LABEL[c]}
+            <span className="inline-flex items-center gap-1.5">
+              {c !== 'all' && <Emblem category={c} className={`h-4 w-4 ${filter === c ? `cat-text-${c}` : ''}`} />}
+              {c === 'all' ? 'All bounties' : CATEGORY_LABEL[c]}
+            </span>
           </button>
         ))}
+        {session && (
+          <button onClick={toggleHideMine} aria-pressed={hideMine}
+            className={`rounded-full px-3.5 py-1 font-sc text-sm font-bold shadow-[0_2px_4px_rgba(0,0,0,.4)] transition ${
+              hideMine ? 'bg-brass text-ink' : 'bg-oak-900/70 text-parchment-100 hover:bg-oak-900'}`}>
+            {hideMine ? 'Showing open to me' : 'Hide ones I\'ve claimed'}
+          </button>
+        )}
       </div>
+
+      <CategoryKey showMostWanted={wanted.length > 0} />
+      {!notStarted && <ActivityTicker />}
 
       {!session && (
         <p className="mx-auto mt-4 max-w-xl rounded bg-oak-950/60 px-4 py-2 text-center text-sm text-parchment-100">
@@ -81,7 +114,11 @@ export default function BoardPage() {
       <div className="mt-8 sm:mt-10">
         {board.isLoading ? <Loading label="Pinning up the posters…" />
           : board.error ? <p className="text-center text-parchment-100">Couldn't load the board: {(board.error as Error).message}</p>
-          : <Noticeboard slots={slots} myReputation={myRep} emptyText={filter === 'all' ? undefined : 'No contracts of this kind on the board right now.'} />}
+          : <Noticeboard slots={slots} myReputation={myRep}
+              emptyText={hiddenCount > 0 ? `You've claimed or are waiting on every bounty here. Nice work.` : filter === 'all' ? undefined : 'No contracts of this kind on the board right now.'} />}
+        {hiddenCount > 0 && slots.length > 0 && (
+          <p className="mt-6 text-center text-sm text-parchment-200/80">{hiddenCount} you've claimed or are waiting on {hiddenCount === 1 ? 'is' : 'are'} hidden.</p>
+        )}
       </div>
 
       {wanted.length > 0 && (

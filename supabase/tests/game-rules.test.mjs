@@ -41,7 +41,7 @@ await db.exec(`
     $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
 `);
 
-for (const f of ['migrations/0001_schema.sql', 'migrations/0002_functions.sql', 'migrations/0003_security.sql', 'migrations/0004_profiles_wanted_discord.sql', 'migrations/0005_passphrase_login.sql', 'migrations/0006_admin_entry_and_review_alerts.sql', 'seed.sql', 'seed_most_wanted.sql']) {
+for (const f of ['migrations/0001_schema.sql', 'migrations/0002_functions.sql', 'migrations/0003_security.sql', 'migrations/0004_profiles_wanted_discord.sql', 'migrations/0005_passphrase_login.sql', 'migrations/0006_admin_entry_and_review_alerts.sql', 'migrations/0007_tavern_results_and_admin_tools.sql', 'seed.sql', 'seed_most_wanted.sql']) {
   await db.exec(fs.readFileSync(`${root}/supabase/${f}`, 'utf8'));
   console.log('loaded', f);
 }
@@ -332,6 +332,93 @@ await as(discordie.id);
 ok((await q(`select my_unseen_reviews() n`))[0].n === 1, 'a later rejection shows up as new');
 await as(adminA);
 
+// --- Revoking an approval -------------------------------------------------------
+full = await q(`select * from get_board()`);
+const kingSlot = full.find(b => b.title === 'Long Live the King');
+const kingBefore = kingSlot.approved_count;
+const hunter4Before = Number((await q(`select * from get_player_summary($1)`, [P[3]]))[0].reputation);
+const hunter4Claim = (await q(`select id from submissions where contract_id = $1 and player_id = $2 and status = 'approved'`, [kingSlot.contract_id, P[3]]))[0].id;
+await as(P[0]);
+await expectErr(() => q(`select revoke_approval($1, 'oops')`, [hunter4Claim]), /Only admins/, 'players cannot revoke approvals');
+await as(adminA);
+await expectErr(() => q(`select revoke_approval($1, '')`, [hunter4Claim]), /reason/, 'revoking needs a reason');
+const rv = (await q(`select revoke_approval($1, 'Wrong boss in screenshot') r`, [hunter4Claim]))[0].r;
+ok(rv.reputation_removed === 30 && rv.claims === kingBefore - 1, `revoke removes the 30 reputation and frees the slot (${kingBefore} -> ${rv.claims})`);
+ok(Number((await q(`select * from get_player_summary($1)`, [P[3]]))[0].reputation) === hunter4Before - 30, "player's total drops by the revoked award");
+const rvRow = (await q(`select status, review_note from submissions where id = $1`, [hunter4Claim]))[0];
+ok(rvRow.status === 'rejected' && rvRow.review_note === 'Approval revoked: Wrong boss in screenshot', 'player sees the claim as rejected with the reason');
+await expectErr(() => q(`select revoke_approval($1, 'again')`, [hunter4Claim]), /Only approved/, 'cannot revoke twice');
+await as(P[3]);
+const reSub = (await q(`select submit_claim(gen_random_uuid(), $1, array['https://imgur.com/fixed'], '{}') id`, [kingSlot.contract_id]))[0].id;
+await as(adminA);
+ok((await q(`select review_submission($1, true) r`, [reSub]))[0].r.status === 'approved', 'player can resubmit and be approved again after a revoke');
+ok((await q(`select count(*)::int n from audit_log where action = 'submission.revoked'`))[0].n === 1, 'revokes are in the audit log');
+
+// --- Pending counts, activity, results ----------------------------------------------
+full = await q(`select * from get_board()`);
+ok(full.every(b => b.contract_id === null || typeof b.pending_count === 'number'), 'board reports pending counts');
+await as(P[4]);
+const pend = full.find(b => b.title === 'Golden Touch');
+await q(`select submit_claim(gen_random_uuid(), $1, array['https://imgur.com/g'], '{}')`, [pend.contract_id]);
+await as(adminA);
+ok((await q(`select pending_count from get_board() where contract_id = $1`, [pend.contract_id]))[0].pending_count === 1, 'pending claim shows on the poster count');
+const act = await q(`select * from get_activity(50)`);
+ok(act.some(a => a.kind === 'claim' && a.player === 'Hunter 4' && a.title === 'Long Live the King'), 'activity lists approved claims with names');
+ok(act.some(a => a.kind === 'retired' && a.title === 'Royal Pain'), 'activity lists fully claimed bounties');
+ok(act.some(a => a.kind === 'posted' && a.title && a.contract_id), 'activity lists new bounties with links');
+ok(act.filter(a => a.kind === 'claim' && a.player === 'Hunter 4' && a.title === 'Long Live the King').length === 1, 'revoked approval drops out of the activity feed');
+const stats = (await q(`select get_event_stats() s`))[0].s;
+ok(stats.podium.length >= 3 && stats.podium[0].rs_name === 'Hunter 1', `results podium (${stats.podium.map(p => p.rs_name).join(', ')})`);
+ok(stats.category_winners.pvm.length >= 1 && Array.isArray(stats.category_winners.special), 'results include category winners');
+ok(stats.bounties_claimed === 1 && stats.fastest && stats.fastest.title === 'Royal Pain', 'results include the fastest claimed bounty');
+ok(Number(stats.claims) > 0 && Number(stats.hunters) > 0 && stats.busiest, 'results include totals and the busiest bounty');
+
+// --- Tavern chat -------------------------------------------------------------------
+await as(P[0]);
+const m1 = (await q(`select post_chat('Royal Pain was mine first, nerds') id`))[0].id;
+ok(!!m1, 'players can post in the Tavern');
+await expectErr(() => q(`select post_chat('Royal Pain was mine first, nerds')`), /just said that/, 'duplicate message blocked');
+await expectErr(() => q(`select post_chat('   ')`), /Say something/, 'empty message blocked');
+await expectErr(() => q(`select post_chat($1)`, ['x'.repeat(501)]), /500/, 'long message blocked');
+await q(`select post_chat('two')`); await q(`select post_chat('three')`); await q(`select post_chat('four')`);
+await expectErr(() => q(`select post_chat('five')`), /Slow down/, 'rapid posting slowed down');
+let chat = await q(`select * from get_chat()`);
+ok(chat.length === 4 && chat[0].rs_name === 'Hunter 1' && chat[0].rank_name, 'chat shows names and rank titles, oldest first');
+await as(P[1]);
+await expectErr(() => q(`select delete_chat($1)`, [m1]), /your own/, "players cannot delete others' messages");
+await as(adminA);
+await q(`select delete_chat($1)`, [m1]);
+ok((await q(`select count(*)::int n from get_chat()`))[0].n === 3, 'admin deletes a message');
+await q(`select set_player_muted($1, true)`, [P[1]]);
+await as(P[1]);
+await expectErr(() => q(`select post_chat('let me talk')`), /muted/, 'muted player cannot post');
+await as(adminA);
+await q(`select set_player_muted($1, false)`, [P[1]]);
+await as('');
+await expectErr(() => q(`select post_chat('anon')`), /Sign in/, 'guests cannot post');
+await as(adminA);
+
+// --- Daily Discord standings --------------------------------------------------------------
+await q(`truncate net.calls`);
+await q(`update integration_settings set daily_post_hour = null, last_daily_post_on = null, final_posted = false, notify_approvals = true`);
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'daily post off', 'no daily post unless an hour is set');
+const londonHour = (await q(`select extract(hour from now() at time zone 'Europe/London')::int h`))[0].h;
+await q(`update integration_settings set daily_post_hour = $1`, [londonHour]);
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'posted', 'posts at the chosen London hour');
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'already posted today', 'only once a day');
+let post = (await q(`select body from net.calls order by id desc limit 1`))[0].body.content;
+ok(/Standings, day \d+ of \d+/.test(post) && post.includes(':first_place: **Hunter 1**'), `daily post content: ${post.split('\n')[0]}`);
+await q(`update integration_settings set daily_post_hour = $1`, [(londonHour + 1) % 24]);
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'not the hour', 'waits for the chosen hour');
+await q(`select send_standings_now()`);
+ok((await q(`select count(*)::int n from net.calls`))[0].n === 2, 'admin can post standings on demand');
+await q(`update event_settings set ends_at = now() - interval '1 minute', starts_at = now() - interval '14 days'`);
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'final posted', 'final standings posted when the event ends');
+ok((await q(`select post_daily_leaderboard() r`))[0].r === 'final already posted', 'final standings posted only once');
+post = (await q(`select body from net.calls order by id desc limit 1`))[0].body.content;
+ok(post.startsWith(':crossed_swords: **The hunt is over!**') && post.includes('/results>'), 'final post links to the results page');
+await q(`update event_settings set ends_at = now() + interval '12 days', starts_at = now() - interval '2 days'`);
+
 // --- Row-level security as real roles --------------------------------------
 await as(P[1]);
 await db.exec(`set role authenticated`);
@@ -350,6 +437,10 @@ const upd = await db.query(`update event_settings set is_paused = true`);
 ok(upd.affectedRows === 0, 'players cannot change settings');
 ok((await q(`select count(*)::int n from get_board() where tier = 'main'`))[0].n === 12, 'players can read the board');
 ok((await q(`select count(*)::int n from integration_settings`))[0].n === 0, 'players cannot read the Discord webhook or join code');
+ok((await q(`select count(*)::int n from chat_messages where deleted_at is not null`))[0].n === 0, 'players cannot see deleted chat messages');
+await expectErr(() => q(`insert into chat_messages (player_id, body) values (auth.uid(), 'sneaky')`), /permission denied/, 'chat only through post_chat');
+await expectErr(() => q(`select set_player_muted($1, true)`, [P[2]]), /Only admins/, 'players cannot mute');
+await expectErr(() => q(`select send_standings_now()`), /Only admins/, 'players cannot post standings');
 await expectErr(() => q(`select send_discord_test()`), /Only admins/, 'players cannot send Discord messages');
 ok((await q(`select get_hunter('Hunter 1') h`))[0].h.rs_name === 'Hunter 1', 'players can view public profiles');
 await db.exec(`reset role`);
@@ -364,6 +455,9 @@ await as('');
 await db.exec(`set role anon`);
 ok((await q(`select count(*)::int n from get_board() where tier = 'main'`))[0].n === 12, 'visitors can read the board');
 ok((await q(`select get_hunter('Hunter 1') h`))[0].h.claims.length >= 1, 'visitors can view public profiles');
+ok((await q(`select count(*)::int n from get_chat()`))[0].n === 3 && (await q(`select count(*)::int n from get_activity()`))[0].n > 0, 'visitors can read the Tavern and activity');
+ok((await q(`select get_event_stats() s`))[0].s.podium.length > 0, 'visitors can see results');
+await expectErr(() => q(`select revoke_approval(gen_random_uuid(), 'x')`), /permission denied/, 'visitors cannot call admin functions');
 ok((await q(`select check_signup('Brand New') m`))[0].m === null && (await q(`select signup_needs_code() n`))[0].n === false, 'visitors can run the sign-up check');
 ok(/@players\.gmw\.invalid$/.test((await q(`select login_email_for('Newcomer') e`))[0].e), 'visitors can look up a login to sign in');
 await expectErr(() => q(`select admin_set_passphrase($1, 'brand-new-passphrase-88')`, [newbie.id]), /permission denied/, 'visitors cannot reset passphrases');

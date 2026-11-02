@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CategoryChip, Loading, Notice, StatusChip } from '../../components/ui';
+import { Lightbox } from '../../components/Lightbox';
 import { useAuth } from '../../lib/auth';
 import { useSettings } from '../../lib/queries';
 import { EVIDENCE_BUCKET, errorMessage, must, supabase } from '../../lib/supabase';
@@ -52,13 +53,38 @@ export default function ReviewQueue() {
   );
 }
 
+const REASONS = [
+  'Codeword not visible',
+  'Name not visible next to the codeword',
+  'Wrong boss or task',
+  'Not enough shown (count or items)',
+  'Screenshot too unclear to read',
+];
+
 function ReviewCard({ s }: { s: QueueRow }) {
   const { session } = useAuth();
   const codeword = useSettings().data?.codeword;
   const qc = useQueryClient();
   const [note, setNote] = useState('');
   const [result, setResult] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [revoking, setRevoking] = useState(false);
+  const [revokeReason, setRevokeReason] = useState('');
   const own = s.player_id === session?.user.id;
+
+  const revoke = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('revoke_approval', { p_submission_id: s.id, p_reason: revokeReason.trim() });
+      if (error) throw error;
+      return data as { contract_status: string; claims: number; reputation_removed: number | null };
+    },
+    onSuccess: (r) => {
+      setRevoking(false);
+      setResult(`Approval revoked and ${r.reputation_removed ?? 0} reputation removed. ${r.contract_status === 'retired'
+        ? 'The bounty had already retired, so it stays in the archive.' : `The bounty now has ${r.claims} approved claims and a slot free.`}`);
+      setTimeout(() => qc.invalidateQueries(), 1500);
+    },
+  });
 
   const urls = useQuery({
     queryKey: ['evidence', s.id],
@@ -108,11 +134,15 @@ function ReviewCard({ s }: { s: QueueRow }) {
       {(urls.data?.length ?? 0) > 0 && (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           {urls.data!.map((u, i) => (
-            <a key={i} href={u} target="_blank" rel="noreferrer" className="block overflow-hidden rounded border border-ink/30">
+            <button key={i} type="button" onClick={() => setViewing(i)} className="block cursor-zoom-in overflow-hidden rounded border border-ink/30"
+              aria-label={`View screenshot ${i + 1} full size`}>
               <img src={u} alt={`Evidence ${i + 1} from ${s.player?.rs_name ?? 'player'}`} className="h-40 w-full bg-ink/10 object-cover" loading="lazy" />
-            </a>
+            </button>
           ))}
         </div>
+      )}
+      {viewing !== null && urls.data && (
+        <Lightbox images={urls.data} start={viewing} onClose={() => setViewing(null)} caption={`${s.player?.rs_name ?? 'Player'}: ${c?.title ?? ''}`} />
       )}
       {urls.error && <p className="mt-2 text-sm text-wax-pvm">Couldn't load screenshots: {errorMessage(urls.error)}</p>}
       {s.evidence_links.length > 0 && (
@@ -127,7 +157,13 @@ function ReviewCard({ s }: { s: QueueRow }) {
         ) : (
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <label className="label text-sm" htmlFor={`note-${s.id}`}>Note to player (shown on rejection or approval)</label>
+              <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Quick rejection reasons">
+                {REASONS.map((r) => (
+                  <button key={r} type="button" onClick={() => setNote(r)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs ${note === r ? 'border-ink bg-ink text-parchment-50' : 'border-ink/30 hover:bg-ink/5'}`}>{r}</button>
+                ))}
+              </div>
+              <label className="label text-sm" htmlFor={`note-${s.id}`}>Note to player (pick a reason above or write your own)</label>
               <input id={`note-${s.id}`} className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Codeword not visible in screenshot 2" />
             </div>
             <div className="flex gap-2">
@@ -137,7 +173,28 @@ function ReviewCard({ s }: { s: QueueRow }) {
           </div>
         )
       ) : (
-        <p className="mt-2 text-sm text-ink-soft">Reviewed {fmtDateTime(s.reviewed_at)}{s.review_note ? `: ${s.review_note}` : ''}</p>
+        <>
+          <p className="mt-2 text-sm text-ink-soft">Reviewed {fmtDateTime(s.reviewed_at)}{s.review_note ? `: ${s.review_note}` : ''}</p>
+          {result && <div className="mt-2"><Notice tone="success">{result}</Notice></div>}
+          {s.status === 'approved' && !result && (
+            revoking ? (
+              <form className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={(e) => { e.preventDefault(); revoke.mutate(); }}>
+                <div className="flex-1">
+                  <label className="label text-sm" htmlFor={`rv-${s.id}`}>Why are you revoking it? The player sees this.</label>
+                  <input id={`rv-${s.id}`} className="field" required minLength={3} value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)}
+                    placeholder="e.g. Approved by mistake: wrong boss in the screenshot" />
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" className="btn btn-ghost" onClick={() => setRevoking(false)}>Cancel</button>
+                  <button className="btn btn-wax" disabled={revoke.isPending}>Revoke approval</button>
+                </div>
+              </form>
+            ) : (
+              <button className="btn btn-sm btn-ghost mt-2" onClick={() => setRevoking(true)}>Revoke approval…</button>
+            )
+          )}
+          {revoke.error && <div className="mt-2"><Notice tone="error">{errorMessage(revoke.error)}</Notice></div>}
+        </>
       )}
       {review.error && <div className="mt-2"><Notice tone="error">{errorMessage(review.error)}</Notice></div>}
     </li>

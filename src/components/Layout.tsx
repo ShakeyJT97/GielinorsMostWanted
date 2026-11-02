@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { useSettings, useUnseenReviews } from '../lib/queries';
+import { useEventPhase, useSettings, useUnseenReviews } from '../lib/queries';
 import { timeLeft } from '../lib/format';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -12,11 +12,14 @@ export function Layout() {
   const settings = useSettings().data;
   const [open, setOpen] = useState(false);
   const unseen = useUnseenReviews(session?.user.id).data ?? 0;
+  const { phase } = useEventPhase();
 
   const links = (
     <>
       <NavLink to="/" end className={linkCls} onClick={() => setOpen(false)}>Board</NavLink>
+      <NavLink to="/tavern" className={linkCls} onClick={() => setOpen(false)}>Tavern</NavLink>
       <NavLink to="/leaderboard" className={linkCls} onClick={() => setOpen(false)}>Leaderboard</NavLink>
+      {phase === 'ended' && <NavLink to="/results" className={linkCls} onClick={() => setOpen(false)}>Results</NavLink>}
       <NavLink to="/archive" className={linkCls} onClick={() => setOpen(false)}>Archive</NavLink>
       <NavLink to="/how-it-works" className={linkCls} onClick={() => setOpen(false)}>How it works</NavLink>
       {session && (
@@ -42,11 +45,11 @@ export function Layout() {
       <header className="border-b border-black/40 bg-oak-900/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
           <Link to="/" className="mr-auto leading-tight">
-            <span className="block font-display text-lg text-brass sm:text-xl">Gielinor's Most Wanted</span>
+            <span className="block font-display text-lg text-brass sm:text-xl">{settings?.event_name ?? "Gielinor's Most Wanted"}</span>
             <span className="block text-xs text-parchment-200/80">A {settings?.clan_name ?? 'UwU Girls'} clan event</span>
           </Link>
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Main">{links}</nav>
-          <div className="hidden items-center gap-2 lg:flex">
+          <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main">{links}</nav>
+          <div className="hidden items-center gap-2 xl:flex">
             {session ? (
               <>
                 <span className="text-sm text-parchment-200">{profile?.rs_name ?? 'New hunter'}</span>
@@ -56,12 +59,12 @@ export function Layout() {
               <Link to="/login" className="btn btn-sm btn-brass">Join or sign in</Link>
             )}
           </div>
-          <button className="btn btn-sm border border-parchment-200/40 text-parchment-100 lg:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
+          <button className="btn btn-sm border border-parchment-200/40 text-parchment-100 xl:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
             Menu
           </button>
         </div>
         {open && (
-          <nav id="mobile-nav" className="flex flex-col gap-1 border-t border-black/40 px-4 py-3 lg:hidden" aria-label="Main">
+          <nav id="mobile-nav" className="flex flex-col gap-1 border-t border-black/40 px-4 py-3 xl:hidden" aria-label="Main">
             {links}
             {session
               ? <button className="btn btn-sm mt-2 border border-parchment-200/40 text-parchment-100" onClick={signOut}>Sign out</button>

@@ -74,7 +74,7 @@ export default function PlayersAdmin() {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className={p.is_banned ? 'opacity-60' : ''}>
-                  <td>{p.rs_name ?? <em>Not set yet</em>}{p.is_banned && ' (banned)'}</td>
+                  <td>{p.rs_name ?? <em>Not set yet</em>}{p.is_banned && ' (banned)'}{p.is_muted && ' (muted)'}</td>
                   <td>{totals.get(p.id) ?? 0}</td>
                   <td className="capitalize">{p.role}</td>
                   <td>
@@ -91,6 +91,9 @@ export default function PlayersAdmin() {
                         </button>
                         <button className="btn btn-sm btn-ghost" onClick={() => act.mutate({ fn: 'set_player_banned', args: { p_player: p.id, p_banned: !p.is_banned } })}>
                           {p.is_banned ? 'Unban' : 'Ban'}
+                        </button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => act.mutate({ fn: 'set_player_muted', args: { p_player: p.id, p_muted: !p.is_muted } })}>
+                          {p.is_muted ? 'Unmute in Tavern' : 'Mute in Tavern'}
                         </button>
                       </>}
                     </div>
