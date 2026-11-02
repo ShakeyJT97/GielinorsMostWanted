@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { errorMessage, supabase } from '../../lib/supabase';
 import type { BoardSlot, SubmissionStatus } from '../../lib/types';
 import { CATEGORY_LABEL, DIFFICULTY_LABEL } from '../../lib/types';
 import { DifficultyMarks, Emblem, WaxSeal } from './Emblem';
@@ -114,6 +117,10 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
           </p>
         )}
         {mine && <p className="mt-1 text-center font-sc text-sm font-bold text-ink">{mine}</p>}
+        {myReputation !== null && !paused && !stamped && remaining > 0 && !locked
+          && slot.my_status !== 'pending' && slot.my_status !== 'approved' && (
+          <HuntButton slot={slot} />
+        )}
       </article>
       {paused && !stamped && <PausedSign whole={eventPaused && !slotPaused} />}
       {stamped && (
@@ -121,6 +128,39 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
           <span>Bounty<br />claimed</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** "I'm hunting this" straight from the board. Sits above the poster's link so it doesn't open the bounty. */
+function HuntButton({ slot }: { slot: BoardSlot }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const on = !!slot.i_am_hunting;
+
+  async function toggle() {
+    setBusy(true); setError(null);
+    // Flip it on the board straight away
+    qc.setQueryData<BoardSlot[]>(['board'], (rows) => rows?.map((r) => (r.contract_id === slot.contract_id
+      ? { ...r, i_am_hunting: !on, hunting_count: Math.max(0, (r.hunting_count ?? 0) + (on ? -1 : 1)) } : r)));
+    const { error } = await supabase.rpc('toggle_hunt', { p_contract_id: slot.contract_id });
+    setBusy(false);
+    if (error) setError(errorMessage(error));
+    qc.invalidateQueries({ queryKey: ['board'] });
+    qc.invalidateQueries({ queryKey: ['hunters', slot.contract_id] });
+  }
+
+  return (
+    <div className="relative z-10 mt-2 text-center">
+      <button type="button" onClick={toggle} disabled={busy} aria-pressed={on}
+        className={`rounded-full border px-3 py-1 font-sc text-sm font-bold transition ${on
+          ? 'border-ink bg-ink text-parchment-50 hover:bg-ink/85'
+          : 'border-ink/40 bg-parchment-50/40 text-ink hover:bg-ink/10'}`}>
+        {on ? "✓ You're hunting this" : "I'm hunting this"}
+      </button>
+      {on && <p className="mt-0.5 text-xs text-ink-soft">Press again to stop</p>}
+      {error && <p className="mt-1 text-xs font-bold text-[#7a1a1a]">{error}</p>}
     </div>
   );
 }

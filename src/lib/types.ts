@@ -173,6 +173,7 @@ export interface HunterProfile {
 export interface IntegrationSettings {
   id: boolean;
   discord_webhook_url: string | null;
+  admin_webhook_url?: string | null;
   notify_approvals: boolean;
   notify_retirements: boolean;
   notify_new_bounties: boolean;

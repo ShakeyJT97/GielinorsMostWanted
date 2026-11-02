@@ -5,6 +5,7 @@ import { useEventPhase, useSettings, useUnseenReviews } from '../lib/queries';
 import { timeLeft } from '../lib/format';
 import { TavernLauncher } from './tavern/TavernLauncher';
 import { OnlineNow } from './OnlineNow';
+import { ReviewAlerts, usePendingCount } from './ReviewAlerts';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `rounded px-3 py-1.5 font-sc font-bold transition ${isActive ? 'bg-parchment-100 text-ink' : 'text-parchment-100 hover:bg-white/10'}`;
@@ -15,6 +16,7 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const unseen = useUnseenReviews(session?.user.id).data ?? 0;
   const { phase } = useEventPhase();
+  const pending = usePendingCount().data ?? 0;
 
   const links = (
     <>
@@ -35,7 +37,17 @@ export function Layout() {
           )}
         </NavLink>
       )}
-      {isAdmin && <NavLink to="/admin" className={linkCls} onClick={() => setOpen(false)}>Admin</NavLink>}
+      {isAdmin && (
+        <NavLink to="/admin" className={linkCls} onClick={() => setOpen(false)}>
+          Admin
+          {pending > 0 && (
+            <span className="ml-1.5 inline-grid h-5 min-w-5 place-items-center rounded-full bg-brass px-1.5 align-[1px] font-serif text-xs font-bold text-ink"
+              title={`${pending} claim${pending === 1 ? '' : 's'} waiting for review`}>
+              {pending}<span className="sr-only"> claims waiting for review</span>
+            </span>
+          )}
+        </NavLink>
+      )}
     </>
   );
 
@@ -62,8 +74,13 @@ export function Layout() {
               <Link to="/login" className="btn btn-sm btn-brass">Join or sign in</Link>
             )}
           </div>
-          <button className="btn btn-sm border border-parchment-200/40 text-parchment-100 xl:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
+          <button className="btn btn-sm relative border border-parchment-200/40 text-parchment-100 xl:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>
             Menu
+            {isAdmin && pending > 0 && (
+              <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-brass px-1 font-serif text-xs font-bold text-ink">
+                {pending}<span className="sr-only"> claims waiting for review</span>
+              </span>
+            )}
           </button>
         </div>
         {open && (
@@ -88,6 +105,7 @@ export function Layout() {
         <p className="mt-1">A fan-made clan event. RuneScape is a trademark of Jagex Ltd; this site is not affiliated with Jagex.</p>
       </footer>
       <TavernLauncher />
+      <ReviewAlerts />
     </div>
   );
 }

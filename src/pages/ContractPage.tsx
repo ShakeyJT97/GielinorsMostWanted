@@ -279,7 +279,7 @@ function ClaimForm({ contractId, codeword }: { contractId: string; codeword?: st
         </p>
       )}
       <EvidenceInputs ev={ev}
-        filesHint="Up to 3 images. Large screenshots are shrunk automatically. Only you and the admins can see them."
+        filesHint="Up to 3 PNG, JPG, WebP or GIF images. Big screenshots are shrunk for you; each must end up under 3 MB. Only you and the admins can see them."
         linksHint="Imgur, YouTube, RuneMetrics or similar." />
       <div>
         <label className="label" htmlFor="note">Note for the admins (optional)</label>

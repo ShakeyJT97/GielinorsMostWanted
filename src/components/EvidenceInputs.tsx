@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { formatBytes, shrinkImage } from '../lib/images';
 import { EVIDENCE_BUCKET, supabase } from '../lib/supabase';
 
 const MAX_FILES = 3;
-const MAX_BYTES = 5 * 1024 * 1024;       // storage limit per file, after shrinking
+const MAX_BYTES = 3 * 1024 * 1024;       // storage limit per file, after shrinking (matches the bucket)
 const MAX_PICK_BYTES = 25 * 1024 * 1024; // largest original we'll try to shrink
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
@@ -18,7 +18,7 @@ export function useEvidence() {
     setFileError(null);
     const picked = Array.from(list ?? []).slice(0, MAX_FILES - files.length);
     if (picked.length === 0) return;
-    const wrongType = picked.find((f) => !IMAGE_TYPES.includes(f.type));
+    const wrongType = picked.find((f) => f.type && !IMAGE_TYPES.includes(f.type));
     if (wrongType) { setFileError(`${wrongType.name || 'That file'} isn't a PNG, JPG, WebP or GIF.`); return; }
     const huge = picked.find((f) => f.size > MAX_PICK_BYTES);
     if (huge) { setFileError(`${huge.name} is over 25 MB. Try a smaller screenshot.`); return; }
@@ -26,8 +26,10 @@ export function useEvidence() {
     try {
       const ready = await Promise.all(picked.map(shrinkImage));
       const tooBig = ready.find((f) => f.size > MAX_BYTES);
-      if (tooBig) { setFileError(`${tooBig.name} is still over 5 MB after shrinking. GIFs aren't shrunk; try a PNG or JPG.`); return; }
+      if (tooBig) { setFileError(`${tooBig.name} is over 3 MB. GIFs can't be shrunk; send a PNG or JPG screenshot instead.`); return; }
       setFiles((prev) => [...prev, ...ready].slice(0, MAX_FILES));
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'That file couldn\'t be used.');
     } finally {
       setShrinking(false);
     }
@@ -67,14 +69,21 @@ export function EvidenceInputs({ ev, filesHint, linksHint, allowPaste = false }:
   ev: Evidence; filesHint: string; linksHint: string; allowPaste?: boolean;
 }) {
   const { files, setFiles, links, setLinks, shrinking, fileError, addFiles } = ev;
+  const pickRef = useRef<HTMLInputElement>(null);
+  const full = files.length >= MAX_FILES;
   return (
     <>
       <div onPaste={allowPaste ? (e) => { const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); addFiles(imgs); } } : undefined}>
-        <label className="label" htmlFor="ev-files">Screenshots</label>
-        <input id="ev-files" type="file" accept={IMAGE_TYPES.join(',')} multiple
-          onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
-          disabled={files.length >= MAX_FILES || shrinking}
-          className="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:font-sc file:font-bold file:text-parchment-50" />
+        <p className="label" id="ev-files-label">Screenshots</p>
+        <input ref={pickRef} id="ev-files" type="file" accept={IMAGE_TYPES.join(',')} multiple className="sr-only" tabIndex={-1}
+          aria-hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn btn-sm btn-ink" disabled={full || shrinking} aria-describedby="ev-files-label"
+            onClick={() => pickRef.current?.click()}>
+            {files.length === 0 ? 'Add screenshots' : 'Add another'}
+          </button>
+          <span className="text-sm text-ink-soft">{files.length} of {MAX_FILES} added{full ? ' (that\'s the limit)' : ''}</span>
+        </div>
         <p className="hint">{filesHint}</p>
         {allowPaste && (
           <textarea aria-label="Paste a screenshot here" rows={1} value="" onChange={() => undefined}

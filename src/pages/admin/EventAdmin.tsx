@@ -198,6 +198,7 @@ function DiscordSettings() {
     mutationFn: async () => {
       const { error } = await supabase.from('integration_settings').update({
         discord_webhook_url: f!.discord_webhook_url?.trim() || null,
+        admin_webhook_url: f!.admin_webhook_url?.trim() || null,
         notify_approvals: f!.notify_approvals,
         notify_retirements: f!.notify_retirements,
         notify_new_bounties: f!.notify_new_bounties,
@@ -212,6 +213,11 @@ function DiscordSettings() {
   const test = useMutation({
     mutationFn: async () => { const { error } = await supabase.rpc('send_discord_test'); if (error) throw error; },
     onSuccess: () => setMsg({ tone: 'success', text: 'Test message sent. If it doesn\'t appear in Discord within a minute, check the webhook address.' }),
+    onError: (e) => setMsg({ tone: 'error', text: errorMessage(e) }),
+  });
+  const adminTest = useMutation({
+    mutationFn: async () => { const { error } = await supabase.rpc('send_admin_alert_test'); if (error) throw error; },
+    onSuccess: () => setMsg({ tone: 'success', text: 'Test sent to the admin channel.' }),
     onError: (e) => setMsg({ tone: 'error', text: errorMessage(e) }),
   });
   const standings = useMutation({
@@ -244,6 +250,12 @@ function DiscordSettings() {
           <p className="hint">Only admins can see this. Leave blank to turn Discord posts off.</p>
         </div>
         <div>
+          <label className="label" htmlFor="adminhook">Admin channel webhook (new claims to review)</label>
+          <input id="adminhook" className="field" type="url" placeholder="https://discord.com/api/webhooks/…" autoComplete="off"
+            value={f.admin_webhook_url ?? ''} onChange={(e) => setF({ ...f, admin_webhook_url: e.target.value })} />
+          <p className="hint">Make a webhook in a private admin-only channel. Every new claim posts there with a link to the review queue. Leave blank to turn off.</p>
+        </div>
+        <div>
           <label className="label" htmlFor="site">Site address for links</label>
           <input id="site" className="field" type="url" value={f.site_url ?? ''} onChange={(e) => setF({ ...f, site_url: e.target.value })} />
         </div>
@@ -266,6 +278,7 @@ function DiscordSettings() {
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-wax" disabled={save.isPending}>Save Discord settings</button>
           <button type="button" className="btn btn-ghost" disabled={test.isPending || !q.data?.discord_webhook_url} onClick={() => test.mutate()}>Send test message</button>
+          <button type="button" className="btn btn-ghost" disabled={adminTest.isPending || !q.data?.admin_webhook_url} onClick={() => adminTest.mutate()}>Test admin channel</button>
           <button type="button" className="btn btn-ghost" disabled={standings.isPending || !q.data?.discord_webhook_url} onClick={() => standings.mutate()}>Post standings now</button>
         </div>
       </form>

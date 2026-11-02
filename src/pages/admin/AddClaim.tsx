@@ -154,7 +154,7 @@ export default function AddClaim() {
         </div>
 
         <EvidenceInputs ev={ev} allowPaste
-          filesHint="Save the image from Discord (right-click, Save image) and choose it here. Up to 3."
+          filesHint="Save the image from Discord (right-click, Save image) and choose it here. Up to 3 images, under 3 MB each once shrunk."
           linksHint="Optional: a link to their Discord message. Discord's own image links expire, so upload the screenshot too." />
 
         <div className="grid gap-4 sm:grid-cols-2">

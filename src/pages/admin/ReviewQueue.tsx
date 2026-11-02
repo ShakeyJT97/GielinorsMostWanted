@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { useSettings } from '../../lib/queries';
 import { EVIDENCE_BUCKET, errorMessage, must, supabase } from '../../lib/supabase';
 import { fmtDateTime } from '../../lib/format';
+import { notificationsOn, setNotifications } from '../../components/ReviewAlerts';
 import type { Category, SubmissionStatus } from '../../lib/types';
 
 interface QueueRow {
@@ -46,6 +47,7 @@ export default function ReviewQueue() {
         <button className={`btn btn-sm ${view === 'pending' ? 'btn-ink' : 'btn-ghost'}`} onClick={() => setView('pending')}>Pending, oldest first</button>
         <button className={`btn btn-sm ${view === 'reviewed' ? 'btn-ink' : 'btn-ghost'}`} onClick={() => setView('reviewed')}>Recently reviewed</button>
       </div>
+      <NotifyToggle />
       {q.isLoading ? <Loading /> : q.error ? <Notice tone="error">{errorMessage(q.error)}</Notice>
         : (q.data ?? []).length === 0 ? <p>{view === 'pending' ? 'Nothing waiting. The queue is clear.' : 'No reviewed claims yet.'}</p>
         : <ul className="space-y-5">{q.data!.map((s) => <ReviewCard key={s.id} s={s} />)}</ul>}
@@ -133,12 +135,7 @@ function ReviewCard({ s }: { s: QueueRow }) {
 
       {(urls.data?.length ?? 0) > 0 && (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {urls.data!.map((u, i) => (
-            <button key={i} type="button" onClick={() => setViewing(i)} className="block cursor-zoom-in overflow-hidden rounded border border-ink/30"
-              aria-label={`View screenshot ${i + 1} full size`}>
-              <img src={u} alt={`Evidence ${i + 1} from ${s.player?.rs_name ?? 'player'}`} className="h-40 w-full bg-ink/10 object-cover" loading="lazy" />
-            </button>
-          ))}
+          {urls.data!.map((u, i) => <EvidenceThumb key={i} url={u} label={`Evidence ${i + 1} from ${s.player?.rs_name ?? 'player'}`} onOpen={() => setViewing(i)} />)}
         </div>
       )}
       {viewing !== null && urls.data && (
@@ -198,5 +195,40 @@ function ReviewCard({ s }: { s: QueueRow }) {
       )}
       {review.error && <div className="mt-2"><Notice tone="error">{errorMessage(review.error)}</Notice></div>}
     </li>
+  );
+}
+
+/** A screenshot thumbnail. If the browser can't show it as a picture, it says so instead of offering it. */
+function EvidenceThumb({ url, label, onOpen }: { url: string; label: string; onOpen: () => void }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) {
+    return (
+      <div className="grid h-40 place-items-center rounded border-2 border-wax-pvm bg-wax-pvm/10 p-3 text-center text-sm font-bold text-[#6d1414]" role="alert">
+        Not a real image. Don't download or open it; reject this claim.
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={onOpen} className="block cursor-zoom-in overflow-hidden rounded border border-ink/30" aria-label={`View ${label} full size`}>
+      <img src={url} alt={label} className="h-40 w-full bg-ink/10 object-cover" loading="lazy" onError={() => setBroken(true)} />
+    </button>
+  );
+}
+
+function NotifyToggle() {
+  const [on, setOn] = useState(notificationsOn);
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!('Notification' in window)) return null;
+  return (
+    <p className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+      <button className="btn btn-sm btn-ghost" onClick={async () => {
+        const result = await setNotifications(!on);
+        setOn(result);
+        setMsg(!on && !result ? 'Your browser blocked notifications. Allow them for this site in the address bar, then try again.' : null);
+      }}>
+        {on ? 'Turn off pop-up alerts on this device' : 'Pop-up alert on this device when a claim comes in'}
+      </button>
+      <span className="text-ink-soft">{msg ?? (on ? 'On: you\'ll get a notification while the site is open in a tab.' : 'Works while the site is open in a tab. For alerts anywhere, set up the admin Discord channel under Event.')}</span>
+    </p>
   );
 }

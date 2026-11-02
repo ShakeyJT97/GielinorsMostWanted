@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 export function Lightbox({ images, start, onClose, caption }: { images: string[]; start: number; onClose: () => void; caption?: string }) {
   const [i, setI] = useState(start);
   const [zoom, setZoom] = useState(false);
+  const [broken, setBroken] = useState<Record<number, boolean>>({});
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -21,12 +22,19 @@ export function Lightbox({ images, start, onClose, caption }: { images: string[]
       <div className="flex items-center gap-3 px-4 py-2 text-parchment-100" onClick={(e) => e.stopPropagation()}>
         <span className="mr-auto text-sm">{caption} {images.length > 1 && `(${i + 1} of ${images.length})`}</span>
         <button className="btn btn-sm border border-parchment-200/40" onClick={() => setZoom((z) => !z)}>{zoom ? 'Fit to screen' : 'Actual size'}</button>
-        <a className="btn btn-sm border border-parchment-200/40" href={images[i]} target="_blank" rel="noreferrer">Open in new tab</a>
+        {!broken[i] && <a className="btn btn-sm border border-parchment-200/40" href={images[i]} target="_blank" rel="noreferrer">Open in new tab</a>}
         <button className="btn btn-sm btn-brass" onClick={onClose} autoFocus>Close</button>
       </div>
       <div className={`flex-1 ${zoom ? 'overflow-auto' : 'flex items-center justify-center overflow-hidden'} p-2`} onClick={(e) => e.stopPropagation()}>
-        <img src={images[i]} alt={`${caption ?? 'Screenshot'} ${i + 1}`} onClick={() => setZoom((z) => !z)}
-          className={zoom ? 'max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in object-contain'} />
+        {broken[i] ? (
+          <p className="max-w-md rounded bg-wax-pvm px-4 py-3 text-center text-parchment-50">
+            This file isn't a real image. Don't download or open it; reject the claim.
+          </p>
+        ) : (
+          <img src={images[i]} alt={`${caption ?? 'Screenshot'} ${i + 1}`} onClick={() => setZoom((z) => !z)}
+            onError={() => setBroken((b) => ({ ...b, [i]: true }))}
+            className={zoom ? 'max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in object-contain'} />
+        )}
       </div>
       {images.length > 1 && (
         <div className="flex justify-center gap-3 py-2" onClick={(e) => e.stopPropagation()}>
