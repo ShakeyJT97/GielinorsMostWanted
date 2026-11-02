@@ -87,6 +87,8 @@ export interface BoardSlot {
   claimants: string[];
   my_status: SubmissionStatus | null;
   pending_count: number | null;
+  /** True before the event starts, for players: the poster's details aren't sent. */
+  sealed?: boolean;
 }
 
 export interface Submission {

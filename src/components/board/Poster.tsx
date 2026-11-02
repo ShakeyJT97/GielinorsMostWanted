@@ -17,12 +17,17 @@ interface PosterProps {
   entering?: boolean;
   /** The viewer's reputation, or null when signed out. Used for Most Wanted locks. */
   myReputation?: number | null;
+  /** The whole event is paused by the admins. */
+  eventPaused?: boolean;
+  /** When the board unseals, for sealed posters. */
+  opensAt?: string;
 }
 
-export function Poster({ slot, stamped = false, entering = false, myReputation = null }: PosterProps) {
+export function Poster({ slot, stamped = false, entering = false, myReputation = null, eventPaused = false, opensAt }: PosterProps) {
   const tilt = TILTS[(slot.slot_id * 7 + slot.slot_position) % TILTS.length];
   const wanted = slot.tier === 'wanted';
 
+  if (slot.sealed) return <SealedPoster slot={slot} tilt={tilt} opensAt={opensAt} />;
   if (!slot.contract_id || !slot.title || !slot.difficulty || !slot.category) {
     return <EmptyPoster slot={slot} tilt={tilt} />;
   }
@@ -31,7 +36,8 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
   const claimed = Math.min(slot.approved_count ?? 0, limit);
   const remaining = limit - claimed;
   const wear = Math.max(wanted ? 2 : 0, Math.min(4, Math.round((claimed / limit) * 4)));
-  const paused = slot.slot_state === 'paused';
+  const slotPaused = slot.slot_state === 'paused';
+  const paused = slotPaused || eventPaused;
   const mine = slot.my_status ? MY_STATUS[slot.my_status] : undefined;
   const need = slot.min_reputation ?? 0;
   const locked = wanted && need > 0 && (myReputation ?? 0) < need && !slot.my_status;
@@ -43,7 +49,7 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
     >
       <span className="nail left-1/2 top-2 -translate-x-1/2" aria-hidden />
       <article
-        className={`poster ${wanted ? "poster-wanted px-7" : "px-5"} flex h-full flex-col pb-5 pt-8 ${paused ? 'opacity-70 grayscale-[.4]' : ''}`}
+        className={`poster ${wanted ? "poster-wanted px-7" : "px-5"} flex h-full flex-col pb-5 pt-8 ${paused ? 'saturate-[.6]' : ''}`}
         data-wear={wear}
         aria-label={`${slot.title}, ${wanted ? 'Most Wanted' : CATEGORY_LABEL[slot.category]} bounty`}
       >
@@ -93,7 +99,7 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
 
         <ClaimTally limit={limit} claimants={slot.claimants} />
         <p className="mt-1 text-center text-sm text-ink-soft">
-          {paused ? 'Paused by the admins' : remaining === 0 ? 'All claims taken' : `${remaining} of ${limit} claims left`}
+          {paused ? 'Claims on hold' : remaining === 0 ? 'All claims taken' : `${remaining} of ${limit} claims left`}
         </p>
         {!paused && remaining > 0 && (slot.pending_count ?? 0) > 0 && (
           <p className={`text-center text-sm font-bold ${(slot.pending_count ?? 0) >= remaining ? 'text-[#7a1a1a]' : 'text-ink-soft'}`}>
@@ -102,6 +108,7 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
         )}
         {mine && <p className="mt-1 text-center font-sc text-sm font-bold text-ink">{mine}</p>}
       </article>
+      {paused && !stamped && <PausedSign whole={eventPaused && !slotPaused} />}
       {stamped && (
         <div className="stamp" role="status">
           <span>Bounty<br />claimed</span>
@@ -160,6 +167,44 @@ function EmptyPoster({ slot, tilt }: { slot: BoardSlot; tilt: number }) {
             ? 'A new Most Wanted contract will be posted here soon.'
             : `A new ${CATEGORY_LABEL[slot.category!]} contract will be posted here soon.`}
         </p>
+      </article>
+    </div>
+  );
+}
+
+/** A wooden "closed" sign hung over a poster on two strings. */
+function PausedSign({ whole }: { whole: boolean }) {
+  return (
+    <div className="paused-sign" role="status">
+      <span className="paused-sign-board">
+        <span className="carved block font-display text-2xl leading-none tracking-wider">Paused</span>
+        <span className="mt-1 block font-sc text-xs font-bold text-parchment-200">{whole ? 'The hunt is on hold' : 'Claims on hold'}</span>
+      </span>
+    </div>
+  );
+}
+
+/** Before the event starts: a folded, sealed notice. The bounty itself isn't sent to the browser. */
+function SealedPoster({ slot, tilt, opensAt }: { slot: BoardSlot; tilt: number; opensAt?: string }) {
+  const when = opensAt ? new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(opensAt)) : null;
+  const wanted = slot.tier === 'wanted' || !slot.category;
+  return (
+    <div className="poster-wrap" style={{ ['--tilt' as string]: `${tilt}deg` }}>
+      <span className="nail left-1/2 top-2 -translate-x-1/2" aria-hidden />
+      <article className={`poster poster-sealed ${wanted ? 'poster-wanted' : ''} flex h-full min-h-[24rem] flex-col items-center justify-center px-6 pb-6 pt-8 text-center`}
+        data-wear="1" aria-label={`Sealed ${wanted ? 'Most Wanted' : CATEGORY_LABEL[slot.category!]} bounty`}>
+        <p className={`font-sc text-sm font-bold ${wanted ? 'text-[#6d1414]' : `cat-text-${slot.category}`}`}>
+          {wanted ? 'Most Wanted' : `${CATEGORY_LABEL[slot.category!]} contract`}
+        </p>
+        <div className="my-5">
+          {wanted ? (
+            <div className="seal grid h-[72px] w-[72px] place-items-center font-display text-3xl" style={{ ['--wax' as string]: '#6d1414' }} aria-hidden>
+              <span className="relative z-10">?</span>
+            </div>
+          ) : <WaxSeal category={slot.category!} size={72} />}
+        </div>
+        <p className="font-display text-3xl leading-none text-ink">Sealed</p>
+        <p className="mt-3 text-ink-soft">{when ? <>Opens {when}</> : 'Opens when the hunt begins'}</p>
       </article>
     </div>
   );

@@ -25,6 +25,14 @@ export default function ContractPage() {
 
   if (contractQ.isLoading) return <Sheet><Loading /></Sheet>;
   const c = contractQ.data;
+  if (!c && phase === 'before' && settings) {
+    return (
+      <Sheet className="mx-auto max-w-2xl">
+        <h1 className="font-display text-2xl">Still sealed</h1>
+        <p className="mt-2">The bounties are revealed when the hunt begins, {fmtWhen(settings.starts_at)}. <Link to="/">Back to the board</Link></p>
+      </Sheet>
+    );
+  }
   if (!c) {
     return (
       <Sheet className="mx-auto max-w-2xl">

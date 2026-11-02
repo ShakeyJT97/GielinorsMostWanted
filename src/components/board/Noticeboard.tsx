@@ -9,7 +9,7 @@ const STAMP_MS = 2900;
  * Lays out the posters and plays the BOUNTY CLAIMED stamp when a slot's
  * contract is retired and replaced while the page is open.
  */
-export function Noticeboard({ slots, myReputation = null, emptyText }: { slots: BoardSlot[]; myReputation?: number | null; emptyText?: string }) {
+export function Noticeboard({ slots, myReputation = null, emptyText, eventPaused = false, opensAt }: { slots: BoardSlot[]; myReputation?: number | null; emptyText?: string; eventPaused?: boolean; opensAt?: string }) {
   const prev = useRef<Map<number, BoardSlot> | null>(null);
   const [leaving, setLeaving] = useState<Record<number, BoardSlot>>({});
   const [entering, setEntering] = useState<Record<number, boolean>>({});
@@ -51,7 +51,8 @@ export function Noticeboard({ slots, myReputation = null, emptyText }: { slots: 
         <li key={s.slot_id} className="flex flex-col [&>*]:flex-1">
           {leaving[s.slot_id]
             ? <Poster slot={leaving[s.slot_id]} stamped myReputation={myReputation} />
-            : <Poster key={s.contract_id ?? `empty-${s.slot_id}`} slot={s} entering={entering[s.slot_id]} myReputation={myReputation} />}
+            : <Poster key={s.contract_id ?? `empty-${s.slot_id}`} slot={s} entering={entering[s.slot_id]} myReputation={myReputation}
+                eventPaused={eventPaused} opensAt={opensAt} />}
         </li>
       ))}
     </ul>

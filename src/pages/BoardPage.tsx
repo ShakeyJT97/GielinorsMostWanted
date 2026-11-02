@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Noticeboard } from '../components/board/Noticeboard';
 import { CategoryKey } from '../components/board/CategoryKey';
@@ -6,7 +7,7 @@ import { ActivityTicker, Countdown } from '../components/board/BoardExtras';
 import { Emblem } from '../components/board/Emblem';
 import { Loading } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { useBoard, useBoardRealtime, usePlayerSummary, useSettings } from '../lib/queries';
+import { useBoard, useBoardRealtime, useEventPhase, usePlayerSummary, useSettings } from '../lib/queries';
 import { fmtDay, timeLeft } from '../lib/format';
 import { CATEGORIES, CATEGORY_LABEL, type Category } from '../lib/types';
 
@@ -32,7 +33,14 @@ export default function BoardPage() {
   const board = useBoard();
   useBoardRealtime();
   const settings = useSettings().data;
-  const { session } = useAuth();
+  const { session, isAdmin } = useAuth();
+  const { phase } = useEventPhase();
+  const qc = useQueryClient();
+  // When the event opens (or pauses/resumes), refetch so posters unseal without a reload
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['board'] });
+    qc.invalidateQueries({ queryKey: ['activity'] });
+  }, [phase, qc]);
   const summary = usePlayerSummary(session?.user.id).data;
   const myRep = session ? Number(summary?.reputation ?? 0) : null;
   const [filter, setFilter] = useState<Category | 'all'>('all');
@@ -71,6 +79,11 @@ export default function BoardPage() {
       </div>
 
       {settings && notStarted && <Countdown settings={settings} />}
+      {settings && notStarted && isAdmin && (
+        <p className="mx-auto mt-4 w-fit max-w-xl rounded bg-brass/90 px-4 py-2 text-center text-sm font-bold text-ink">
+          Admin preview: players and guests see these posters sealed until the event starts.
+        </p>
+      )}
       {settings && ended && (
         <p className="mx-auto mt-5 w-fit rounded bg-oak-950/70 px-4 py-2 text-center text-parchment-100">
           The final bounty has been called. <Link to="/results" className="font-bold text-brass underline underline-offset-2">See the results</Link>
@@ -114,7 +127,7 @@ export default function BoardPage() {
       <div className="mt-8 sm:mt-10">
         {board.isLoading ? <Loading label="Pinning up the posters…" />
           : board.error ? <p className="text-center text-parchment-100">Couldn't load the board: {(board.error as Error).message}</p>
-          : <Noticeboard slots={slots} myReputation={myRep}
+          : <Noticeboard slots={slots} myReputation={myRep} eventPaused={phase === 'paused'} opensAt={settings?.starts_at}
               emptyText={hiddenCount > 0 ? `You've claimed or are waiting on every bounty here. Nice work.` : filter === 'all' ? undefined : 'No contracts of this kind on the board right now.'} />}
         {hiddenCount > 0 && slots.length > 0 && (
           <p className="mt-6 text-center text-sm text-parchment-200/80">{hiddenCount} you've claimed or are waiting on {hiddenCount === 1 ? 'is' : 'are'} hidden.</p>
@@ -128,7 +141,7 @@ export default function BoardPage() {
             <p className="mt-0.5 font-sc text-sm font-bold text-parchment-200/90">Harder bounties for hunters who have proven themselves</p>
           </div>
           <div className="mt-8">
-            <Noticeboard slots={wanted} myReputation={myRep} />
+            <Noticeboard slots={wanted} myReputation={myRep} eventPaused={phase === 'paused'} opensAt={settings?.starts_at} />
           </div>
         </section>
       )}
