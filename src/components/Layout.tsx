@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useEventPhase, useSettings, useUnseenReviews } from '../lib/queries';
 import { timeLeft } from '../lib/format';
+import { TavernLauncher } from './tavern/TavernLauncher';
+import { OnlineNow } from './OnlineNow';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `rounded px-3 py-1.5 font-sc font-bold transition ${isActive ? 'bg-parchment-100 text-ink' : 'text-parchment-100 hover:bg-white/10'}`;
@@ -42,13 +44,14 @@ export function Layout() {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-parchment-100 focus:px-3 focus:py-2 focus:text-ink">
         Skip to content
       </a>
-      <header className="border-b border-black/40 bg-oak-900/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+      <header className="relative z-30 border-b border-black/40 bg-oak-900/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-4">
           <Link to="/" className="mr-auto leading-tight">
             <span className="block font-display text-lg text-brass sm:text-xl">{settings?.event_name ?? "Gielinor's Most Wanted"}</span>
             <span className="block text-xs text-parchment-200/80">A {settings?.clan_name ?? 'UwU Girls'} clan event</span>
           </Link>
           <nav className="hidden items-center gap-0.5 xl:flex" aria-label="Main">{links}</nav>
+          <OnlineNow onNavigate={() => setOpen(false)} />
           <div className="hidden items-center gap-2 xl:flex">
             {session ? (
               <>
@@ -80,10 +83,11 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="mx-auto w-full max-w-7xl px-4 pb-8 text-center text-sm text-parchment-200/70">
+      <footer className="mx-auto w-full max-w-7xl px-4 pb-24 text-center text-sm text-parchment-200/70">
         {settings && <p>Event {new Date() < new Date(settings.starts_at) ? 'starts soon' : timeLeft(settings.ends_at)}</p>}
         <p className="mt-1">A fan-made clan event. RuneScape is a trademark of Jagex Ltd; this site is not affiliated with Jagex.</p>
       </footer>
+      <TavernLauncher />
     </div>
   );
 }

@@ -89,6 +89,9 @@ export interface BoardSlot {
   pending_count: number | null;
   /** True before the event starts, for players: the poster's details aren't sent. */
   sealed?: boolean;
+  /** Players who said "I'm hunting this" in the last 24 hours. */
+  hunting_count?: number | null;
+  i_am_hunting?: boolean;
 }
 
 export interface Submission {
@@ -197,6 +200,28 @@ export interface ChatMessage {
   is_admin: boolean;
   body: string;
   created_at: string;
+  /** emoji -> count */
+  reactions?: Record<string, number>;
+  my_reactions?: string[];
+  pinned?: boolean;
+}
+
+export const REACTIONS = ['⚔️', '😂', '🔥', '💀', '👑', '🍺'] as const;
+
+export interface PinnedMessage {
+  id: number;
+  rs_name: string;
+  body: string;
+  created_at: string;
+  pinned_at: string;
+}
+
+export interface Achievement {
+  key: string;
+  label: string;
+  description: string;
+  times: number;
+  earned_at: string | null;
 }
 
 export interface EventStats {

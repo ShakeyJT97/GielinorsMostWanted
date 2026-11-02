@@ -95,6 +95,26 @@ export default function HowItWorksPage() {
           The <Link to="/tavern">Tavern</Link> is the event's chat. Brag about your kills, plot against the leaders, and trash-talk
           your rivals. Keep it fun: no slurs and nothing personal. Admins can delete messages and mute anyone who takes it too far.
         </p>
+        <p>
+          Open it from the Tavern button in the corner of any page. React to messages with the ☺ button, and look out for pinned
+          announcements from the admins at the top.
+        </p>
+      </Section>
+
+      <Section title="Calling your shot">
+        <p>
+          Going for a bounty? Press <strong>I'm hunting this</strong> on its page so the clan knows you're on the trail. The poster
+          shows how many hunters are after it. It lasts 24 hours, or until you send in your claim, and it doesn't reserve a slot:
+          the first five approved claims still win.
+        </p>
+      </Section>
+
+      <Section title="Badges">
+        <p>
+          Earn badges along the way, like First Blood for the very first approved claim of the event, The Closer for taking the last
+          slot on a bounty, and Clean Sweep for claiming one of each kind. They show on your profile, and you can see which are still
+          left to earn under My bounties.
+        </p>
       </Section>
 
       <Section title="Your account">

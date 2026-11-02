@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CategoryChip, Loading, Notice, Sheet, StatusChip } from '../components/ui';
 import { DifficultyMarks, WaxSeal } from '../components/board/Emblem';
 import { useAuth } from '../lib/auth';
-import { useBoard, useContract, useEventPhase, useMySubmissions, usePlayerSummary, useSettings } from '../lib/queries';
+import { useBoard, useContract, useEventPhase, useHunters, useMySubmissions, usePlayerSummary, useSettings } from '../lib/queries';
 import { fmtDateTime as fmtWhen } from '../lib/format';
 import { HunterLink } from './HunterPage';
 import { errorMessage, supabase } from '../lib/supabase';
@@ -22,6 +22,7 @@ export default function ContractPage() {
   const settings = useSettings().data;
   const myRep = Number(usePlayerSummary(session?.user.id).data?.reputation ?? 0);
   const { phase } = useEventPhase();
+  const hunters = useHunters(contractQ.data?.status === 'active' ? id : undefined).data ?? [];
 
   if (contractQ.isLoading) return <Sheet><Loading /></Sheet>;
   const c = contractQ.data;
@@ -84,6 +85,11 @@ export default function ContractPage() {
             <p className="mt-1">Claimed by {claimants.map((n, i) => <Fragment key={n}>{i > 0 && ', '}<HunterLink name={n} /></Fragment>)}.</p>
           )}
           {c.status === 'retired' && c.retired_at && <p className="mt-1 text-ink-soft">Retired {fmtDateTime(c.retired_at)}.</p>}
+          {live && hunters.length > 0 && (
+            <p className="mt-1 italic">
+              On the trail: {hunters.map((h, i) => <Fragment key={h.rs_name}>{i > 0 && ', '}<HunterLink name={h.rs_name} /></Fragment>)}.
+            </p>
+          )}
         </div>
       </Sheet>
 
@@ -121,7 +127,10 @@ export default function ContractPage() {
               <p className="mt-1">This Most Wanted bounty needs {c.min_reputation} reputation. You have {myRep}; claim main-board bounties to get there.</p>
             </>
           ) : live && slot?.slot_state !== 'paused' ? (
-            <ClaimForm contractId={c.id} codeword={settings?.codeword} />
+            <>
+              <HuntToggle contractId={c.id} hunting={!!slot?.i_am_hunting} />
+              <ClaimForm contractId={c.id} codeword={settings?.codeword} />
+            </>
           ) : (
             <p>This bounty isn't taking claims right now.</p>
           )}
@@ -136,6 +145,34 @@ export default function ContractPage() {
           </Sheet>
         )}
       </aside>
+    </div>
+  );
+}
+
+/** "I'm hunting this": tells the clan you're going for it. Lapses after 24 hours or when you claim. */
+function HuntToggle({ contractId, hunting }: { contractId: string; hunting: boolean }) {
+  const qc = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const toggle = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('toggle_hunt', { p_contract_id: contractId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ['board'] });
+      qc.invalidateQueries({ queryKey: ['hunters', contractId] });
+    },
+    onError: (e) => setError(errorMessage(e)),
+  });
+  return (
+    <div className="mb-4 border-b border-ink/20 pb-4">
+      <button className={`btn w-full ${hunting ? 'btn-ink' : 'btn-ghost border border-ink/40'}`} disabled={toggle.isPending}
+        aria-pressed={hunting} onClick={() => toggle.mutate()}>
+        {hunting ? "You're hunting this (stop)" : "I'm hunting this"}
+      </button>
+      <p className="hint mt-1">{hunting ? 'Others can see you\'re on the trail for the next 24 hours, or until you claim.' : 'Let the clan know you\'re going for it. Optional, and lasts 24 hours.'}</p>
+      {error && <div className="mt-2"><Notice tone="error">{error}</Notice></div>}
     </div>
   );
 }

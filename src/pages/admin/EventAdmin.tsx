@@ -323,6 +323,20 @@ const ACTION_LABEL: Record<string, string> = {
   'reputation.bonus': 'Bonus reputation', 'reputation.adjustment': 'Reputation correction',
   'player.role_set': 'Changed role', 'player.passphrase_reset': 'Reset passphrase', 'submission.entered_by_admin': 'Added claim from Discord', 'submission.revoked': 'Revoked approval',
   'chat.deleted': 'Deleted Tavern message', 'player.muted': 'Muted player', 'player.unmuted': 'Unmuted player', 'player.banned': 'Banned player', 'player.unbanned': 'Unbanned player',
+  'player.joined': 'New sign-up', 'player.named': 'Chose display name', 'player.renamed': 'Changed display name',
+  'chat.pinned': 'Pinned Tavern message', 'chat.unpinned': 'Unpinned Tavern message',
+};
+
+const AUDIT_FILTERS = {
+  all: /./,
+  signups: /^player\.(joined|named|renamed)$/,
+  claims: /^submission\./,
+  board: /^(contract|slot|board)\./,
+  players: /^(player|reputation)\./,
+  tavern: /^chat\.|^player\.(muted|unmuted)$/,
+};
+const AUDIT_FILTER_LABEL: Record<keyof typeof AUDIT_FILTERS, string> = {
+  all: 'Everything', signups: 'Sign-ups', claims: 'Claims', board: 'Board & contracts', players: 'Players & reputation', tavern: 'Tavern',
 };
 
 export function AuditLog() {
@@ -335,17 +349,27 @@ export function AuditLog() {
     queryFn: async () => must(await supabase.from('profiles').select('*')) as { id: string; rs_name: string | null }[],
   });
   const nameOf = (id: string | null | undefined) => (id ? names.data?.find((p) => p.id === id)?.rs_name ?? 'Unknown' : 'System');
+  const [filter, setFilter] = useState<keyof typeof AUDIT_FILTERS>('all');
+  const rows = (log.data ?? []).filter((r) => AUDIT_FILTERS[filter].test(r.action));
 
   return (
     <div>
       <h1 className="mb-3 font-display text-2xl text-ink">Audit log</h1>
-      <p className="mb-4 text-ink-soft">The latest 300 actions. Entries can't be edited or deleted.</p>
+      <p className="mb-3 text-ink-soft">The latest 300 actions. Entries can't be edited or deleted.</p>
+      <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Show">
+        {(Object.keys(AUDIT_FILTERS) as (keyof typeof AUDIT_FILTERS)[]).map((k) => (
+          <button key={k} className={`btn btn-sm ${filter === k ? 'btn-ink' : 'btn-ghost'}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>
+            {AUDIT_FILTER_LABEL[k]}
+          </button>
+        ))}
+      </div>
       {log.isLoading ? <Loading /> : (
         <div className="overflow-x-auto">
           <table className="table-ink min-w-[40rem] text-sm">
             <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
             <tbody>
-              {(log.data ?? []).map((r) => {
+              {rows.length === 0 && <tr><td colSpan={4} className="text-ink-soft">Nothing here yet.</td></tr>}
+              {rows.map((r) => {
                 const d = r.details as Record<string, unknown>;
                 const detail = Object.entries(d)
                   .map(([k, v]) => (k === 'player_id' ? `player: ${nameOf(v as string)}` : `${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`))
@@ -353,7 +377,7 @@ export function AuditLog() {
                 return (
                   <tr key={r.id}>
                     <td className="whitespace-nowrap">{fmtDateTime(r.created_at)}</td>
-                    <td>{nameOf(r.actor_id)}</td>
+                    <td>{r.action === 'player.joined' && !r.actor_id ? String(d.name ?? 'New player') : nameOf(r.actor_id)}</td>
                     <td>{ACTION_LABEL[r.action] ?? r.action}</td>
                     <td className="break-words">{detail}</td>
                   </tr>

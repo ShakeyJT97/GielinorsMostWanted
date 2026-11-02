@@ -106,6 +106,13 @@ export function Poster({ slot, stamped = false, entering = false, myReputation =
             {slot.pending_count} waiting for review
           </p>
         )}
+        {!paused && remaining > 0 && (slot.hunting_count ?? 0) > 0 && (
+          <p className="text-center text-sm italic text-ink-soft">
+            {slot.i_am_hunting
+              ? (slot.hunting_count === 1 ? "You're on the trail" : `You and ${slot.hunting_count! - 1} other${slot.hunting_count === 2 ? '' : 's'} on the trail`)
+              : `${slot.hunting_count} hunter${slot.hunting_count === 1 ? '' : 's'} on the trail`}
+          </p>
+        )}
         {mine && <p className="mt-1 text-center font-sc text-sm font-bold text-ink">{mine}</p>}
       </article>
       {paused && !stamped && <PausedSign whole={eventPaused && !slotPaused} />}

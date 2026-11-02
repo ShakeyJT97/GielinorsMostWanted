@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, must } from './supabase';
 import type {
-  ActivityRow, ArchiveRow, BoardSlot, EventStats, Category, Contract, EventSettings, HunterProfile, LeaderboardRow, PlayerSummary, Rank, Submission,
+  Achievement, ActivityRow, ArchiveRow, BoardSlot, EventStats, Category, Contract, EventSettings, HunterProfile, LeaderboardRow, PlayerSummary, Rank, Submission,
 } from './types';
 
 export function useSettings() {
@@ -108,6 +108,24 @@ export function useUnseenReviews(uid: string | undefined) {
     enabled: !!uid,
     refetchInterval: 60_000,
     queryFn: async () => Number(must(await supabase.rpc('my_unseen_reviews')) ?? 0),
+  });
+}
+
+export function useAchievements(playerId: string | undefined) {
+  return useQuery({
+    queryKey: ['achievements', playerId],
+    enabled: !!playerId,
+    queryFn: async () => must(await supabase.rpc('get_achievements', { p_player: playerId })) as Achievement[],
+    staleTime: 60_000,
+  });
+}
+
+export function useHunters(contractId: string | undefined) {
+  return useQuery({
+    queryKey: ['hunters', contractId],
+    enabled: !!contractId,
+    queryFn: async () => must(await supabase.rpc('get_hunters', { p_contract_id: contractId })) as { rs_name: string; started_at: string }[],
+    refetchInterval: 60_000,
   });
 }
 

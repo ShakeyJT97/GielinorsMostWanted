@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { CategoryChip, Loading, Sheet } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { useHunter } from '../lib/queries';
+import { Badges } from '../components/Badges';
 import { fmtDateTime, fmtDay } from '../lib/format';
 import { CATEGORIES, CATEGORY_LABEL, DIFFICULTY_LABEL } from '../lib/types';
 
@@ -44,6 +45,10 @@ export default function HunterPage() {
         {s?.next_rank_name && s.next_rank_at !== null && (
           <p className="mt-4 text-ink-soft">{s.next_rank_at - rep} reputation to {s.next_rank_name}.</p>
         )}
+      </Sheet>
+
+      <Sheet>
+        <Badges playerId={h.player_id} showLocked={isMe} />
       </Sheet>
 
       <Sheet>

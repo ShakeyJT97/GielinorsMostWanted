@@ -8,6 +8,7 @@ import { CategoryChip, Loading, Notice, PageTitle, Sheet, StatusChip } from '../
 import { useAuth } from '../lib/auth';
 import { useMySubmissions, usePlayerSummary } from '../lib/queries';
 import { fmtDateTime } from '../lib/format';
+import { Badges } from '../components/Badges';
 
 export default function ProfilePage() {
   const { session, profile } = useAuth();
@@ -60,6 +61,10 @@ export default function ProfilePage() {
         <p className="mt-5 text-ink-soft">
           {approved.length} bounties claimed · {counts.pending ?? 0} pending · {counts.rejected ?? 0} rejected
         </p>
+      </Sheet>
+
+      <Sheet>
+        <Badges playerId={uid} showLocked title="Your badges" />
       </Sheet>
 
       <Sheet>
