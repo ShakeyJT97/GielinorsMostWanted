@@ -48,7 +48,8 @@ export function Noticeboard({ slots, myReputation = null, emptyText, eventPaused
   return (
     <ul className="grid grid-cols-1 gap-x-7 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {slots.map((s) => (
-        <li key={s.slot_id} className="flex flex-col [&>*]:flex-1">
+        <li key={s.slot_id} className="flex flex-col [&>*]:flex-1"
+          data-doodle-contract={!leaving[s.slot_id] && s.contract_id && !s.sealed ? s.contract_id : undefined}>
           {leaving[s.slot_id]
             ? <Poster slot={leaving[s.slot_id]} stamped myReputation={myReputation} />
             : <Poster key={s.contract_id ?? `empty-${s.slot_id}`} slot={s} entering={entering[s.slot_id]} myReputation={myReputation}

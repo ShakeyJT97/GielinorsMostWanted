@@ -11,6 +11,7 @@ export default function ArchivePage() {
   return (
     <Sheet className="mx-auto max-w-4xl">
       <PageTitle sub="Every bounty taken off the board, with the hunters who claimed it.">Claimed bounties</PageTitle>
+      <p className="-mt-2 mb-5">Looking for the board's doodles? They're in the <Link to="/gallery">doodle gallery</Link>.</p>
       {arc.isLoading ? <Loading /> : (arc.data ?? []).length === 0 ? (
         <p>Nothing claimed yet. When five hunters finish a bounty, it's filed here.</p>
       ) : (

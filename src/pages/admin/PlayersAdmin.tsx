@@ -8,6 +8,7 @@ import { errorMessage, must, supabase } from '../../lib/supabase';
 import type { Profile, ReputationEvent } from '../../lib/types';
 import { useOnline, pageName } from '../../lib/presence';
 import { ago, fmtDateTime } from '../../lib/format';
+import { shoutRefresh } from '../../lib/doodles';
 
 type SortKey = 'name' | 'joined' | 'seen';
 
@@ -110,7 +111,7 @@ export default function PlayersAdmin() {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className={p.is_banned ? 'opacity-60' : ''}>
-                  <td>{p.rs_name ?? <em>Not set yet</em>}{p.is_banned && ' (banned)'}{p.is_muted && ' (muted)'}</td>
+                  <td>{p.rs_name ?? <em>Not set yet</em>}{p.is_banned && ' (banned)'}{p.is_muted && ' (muted)'}{p.is_draw_banned && ' (no drawing)'}</td>
                   <td>{totals.get(p.id) ?? 0}</td>
                   <td className="capitalize">{p.role}</td>
                   <td className="whitespace-nowrap text-sm" title={fmtDateTime(p.created_at)}>{ago(p.created_at)}</td>
@@ -124,6 +125,11 @@ export default function PlayersAdmin() {
                   <td>
                     <div className="flex flex-wrap gap-1.5">
                       <button className="btn btn-sm btn-ghost" onClick={() => setAdjusting(p)}>Adjust reputation</button>
+                      <button className="btn btn-sm btn-ghost"
+                        onClick={() => window.confirm(`Erase every doodle ${p.rs_name ?? 'this player'} has drawn, including on saved boards in the gallery?`) &&
+                          act.mutate({ fn: 'erase_player_strokes', args: { p_player: p.id } }, { onSuccess: () => shoutRefresh() })}>
+                        Erase drawings
+                      </button>
                       <button className="btn btn-sm btn-ghost" disabled={resetPassphrase.isPending}
                         onClick={() => window.confirm(`Give ${p.rs_name ?? 'this player'} a new passphrase? Their current one stops working and they're signed out everywhere.`) && resetPassphrase.mutate(p)}>
                         Reset passphrase
@@ -138,6 +144,9 @@ export default function PlayersAdmin() {
                         </button>
                         <button className="btn btn-sm btn-ghost" onClick={() => act.mutate({ fn: 'set_player_muted', args: { p_player: p.id, p_muted: !p.is_muted } })}>
                           {p.is_muted ? 'Unmute in Tavern' : 'Mute in Tavern'}
+                        </button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => act.mutate({ fn: 'set_player_draw_banned', args: { p_player: p.id, p_banned: !p.is_draw_banned } })}>
+                          {p.is_draw_banned ? 'Allow drawing' : 'Stop drawing'}
                         </button>
                       </>}
                     </div>

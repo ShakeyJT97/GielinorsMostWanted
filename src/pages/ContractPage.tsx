@@ -11,6 +11,7 @@ import { errorMessage, supabase } from '../lib/supabase';
 import { EvidenceInputs, uploadEvidence, useEvidence } from '../components/EvidenceInputs';
 import { fmtDateTime } from '../lib/format';
 import { DIFFICULTY_LABEL } from '../lib/types';
+import { UNITS, pathD, useContractDoodles } from '../lib/doodles';
 
 
 export default function ContractPage() {
@@ -136,6 +137,8 @@ export default function ContractPage() {
           )}
         </Sheet>
 
+        {!live && <PosterDoodles contractId={c.id} title={c.title} />}
+
         {mySubs.filter((s) => s !== open).length > 0 && (
           <Sheet className="!p-5">
             <h2 className="font-sc text-lg font-bold">Earlier claims</h2>
@@ -174,6 +177,29 @@ function HuntToggle({ contractId, hunting }: { contractId: string; hunting: bool
       <p className="hint mt-1">{hunting ? 'Others can see you\'re on the trail for the next 24 hours, or until you claim.' : 'Let the clan know you\'re going for it. Optional, and lasts 24 hours.'}</p>
       {error && <div className="mt-2"><Notice tone="error">{error}</Notice></div>}
     </div>
+  );
+}
+
+/** The doodles that were on this poster when it came down. */
+function PosterDoodles({ contractId, title }: { contractId: string; title: string }) {
+  const strokes = useContractDoodles(contractId).data ?? [];
+  if (strokes.length === 0) return null;
+  const box = strokes[strokes.length - 1].poster_box!;
+  const h = Math.round((UNITS * box[3]) / box[2]);
+  return (
+    <Sheet className="!p-5">
+      <h2 className="font-sc text-lg font-bold">Doodles left on this poster</h2>
+      <svg viewBox={`0 0 ${UNITS} ${h}`} className="mt-2 w-full rounded bg-[#e6d3a6] shadow-inner" role="img" aria-label={`Doodles on the ${title} poster`}>
+        <text x={UNITS / 2} y={h * 0.16} textAnchor="middle" fontSize={UNITS / 9} fontFamily="Rye, serif" fill="#2a1c11">Bounty</text>
+        <text x={UNITS / 2} y={h * 0.27} textAnchor="middle" fontSize={UNITS / 15} fontFamily="'Alegreya SC', serif" fontWeight="bold" fill="#2a1c11">{title}</text>
+        <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+          {strokes.map((s) => (
+            <path key={s.id} d={pathD(s.poster_points!)} stroke={s.color} opacity={0.92}
+              strokeWidth={Math.max((s.width * UNITS) / s.poster_box![2], 20)} />
+          ))}
+        </g>
+      </svg>
+    </Sheet>
   );
 }
 

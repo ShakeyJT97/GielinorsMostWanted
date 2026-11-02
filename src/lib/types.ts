@@ -18,6 +18,7 @@ export interface Profile {
   role: Role;
   is_banned: boolean;
   is_muted?: boolean;
+  is_draw_banned?: boolean;
   created_at: string;
 }
 

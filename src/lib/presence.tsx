@@ -84,7 +84,7 @@ export function pageName(path: string) {
   if (path.startsWith('/hunters/')) return `${decodeURIComponent(path.split('/')[2] ?? '')}'s profile`;
   if (path.startsWith('/admin')) return 'admin';
   const map: Record<string, string> = {
-    '/tavern': 'the Tavern', '/leaderboard': 'the leaderboard', '/results': 'the results', '/archive': 'the archive',
+    '/tavern': 'the Tavern', '/gallery': 'the doodle gallery', '/leaderboard': 'the leaderboard', '/results': 'the results', '/archive': 'the archive',
     '/how-it-works': 'how it works', '/me': 'their bounties', '/login': 'sign in', '/welcome': 'welcome',
   };
   return map[path] ?? path;

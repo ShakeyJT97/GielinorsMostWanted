@@ -109,6 +109,15 @@ export default function HowItWorksPage() {
         </p>
       </Section>
 
+      <Section title="Doodling on the board">
+        <p>
+          Signed-in hunters can press <strong>Draw on the board</strong> and scribble anywhere: notes, taunts, art. Anything drawn on a
+          poster stays with that poster, and goes into the archive with it when the bounty is claimed. Admins can erase lines and,
+          from time to time, archive the whole board. Every version is kept in the <Link to="/gallery">doodle gallery</Link>.
+        </p>
+        <p>Don't like the mess? Press Hide doodles. Drawings are placed for the screen they were drawn on, so lines on the wood may sit a little differently on a phone.</p>
+      </Section>
+
       <Section title="Badges">
         <p>
           Earn badges along the way, like First Blood for the very first approved claim of the event, The Closer for taking the last

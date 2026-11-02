@@ -5,6 +5,8 @@ import { CategoryChip, Loading, Notice } from '../../components/ui';
 import { useBoard } from '../../lib/queries';
 import { errorMessage, must, supabase } from '../../lib/supabase';
 import { CATEGORY_LABEL, type BoardSlot, type Contract } from '../../lib/types';
+import { shoutRefresh, useSnapshots } from '../../lib/doodles';
+import { fmtDateTime } from '../../lib/format';
 
 export default function BoardControls() {
   const board = useBoard();
@@ -58,7 +60,52 @@ export default function BoardControls() {
           </table>
         </div>
       )}
+      <DoodleArchive />
     </div>
+  );
+}
+
+function DoodleArchive() {
+  const snaps = useSnapshots();
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const archive = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('archive_board', { p_name: name });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setMsg({ tone: 'success', text: 'Saved to the gallery and the board is wiped clean.' });
+      setName('');
+      shoutRefresh();
+      qc.invalidateQueries({ queryKey: ['board-snapshots'] });
+    },
+    onError: (e) => setMsg({ tone: 'error', text: errorMessage(e) }),
+  });
+  return (
+    <section className="mt-10 border-t-2 border-double border-ink/25 pt-6">
+      <h2 className="font-display text-2xl text-ink">Doodles</h2>
+      <p className="mb-3 max-w-2xl text-ink-soft">
+        Archiving saves the board's doodles to the <Link to="/gallery">gallery</Link> under a name, then wipes the board clean.
+        Doodles on posters stay with their posters. To remove a single line, use the Eraser while drawing on the board;
+        to remove everything one player drew, use Admin → Players.
+      </p>
+      <form className="flex max-w-xl flex-wrap gap-2" onSubmit={(e) => {
+        e.preventDefault();
+        if (window.confirm('Save the doodles to the gallery and wipe the board clean?')) archive.mutate();
+      }}>
+        <input className="field flex-1" maxLength={60} placeholder="Name, e.g. End of week one" value={name}
+          onChange={(e) => setName(e.target.value)} aria-label="Name for this saved board" />
+        <button className="btn btn-ink" disabled={archive.isPending}>Archive the board</button>
+      </form>
+      {msg && <div className="mt-3 max-w-xl"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
+      {(snaps.data ?? []).length > 0 && (
+        <ul className="mt-4 space-y-1 text-sm">
+          {snaps.data!.map((s) => <li key={s.id}><strong>{s.name}</strong> · {fmtDateTime(s.taken_at)} · {s.strokes} lines</li>)}
+        </ul>
+      )}
+    </section>
   );
 }
 

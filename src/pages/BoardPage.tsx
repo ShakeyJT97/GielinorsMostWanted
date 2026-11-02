@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Noticeboard } from '../components/board/Noticeboard';
 import { CategoryKey } from '../components/board/CategoryKey';
 import { ActivityTicker, Countdown } from '../components/board/BoardExtras';
 import { Emblem } from '../components/board/Emblem';
+import { DoodleLayer } from '../components/board/DoodleLayer';
 import { Loading } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { useBoard, useBoardRealtime, useEventPhase, usePlayerSummary, useSettings } from '../lib/queries';
@@ -61,9 +62,11 @@ export default function BoardPage() {
   const now = Date.now();
   const notStarted = settings && now < new Date(settings.starts_at).getTime();
   const ended = settings && now > new Date(settings.ends_at).getTime();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const layoutKey = `${board.isLoading}|${slots.map((s) => s.contract_id ?? s.slot_id).join()}|${wanted.map((s) => s.contract_id ?? s.slot_id).join()}|${notStarted}|${ended}|${!!session}`;
 
   return (
-    <div className="board">
+    <div className="board" ref={boardRef}>
       <Lantern side="left" />
       <Lantern side="right" />
 
@@ -114,6 +117,8 @@ export default function BoardPage() {
           </button>
         )}
       </div>
+
+      <DoodleLayer boardRef={boardRef} layoutKey={layoutKey} />
 
       <CategoryKey showMostWanted={wanted.length > 0} />
       {!notStarted && <ActivityTicker />}

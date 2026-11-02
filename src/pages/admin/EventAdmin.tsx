@@ -325,6 +325,8 @@ const ACTION_LABEL: Record<string, string> = {
   'chat.deleted': 'Deleted Tavern message', 'player.muted': 'Muted player', 'player.unmuted': 'Unmuted player', 'player.banned': 'Banned player', 'player.unbanned': 'Unbanned player',
   'player.joined': 'New sign-up', 'player.named': 'Chose display name', 'player.renamed': 'Changed display name',
   'chat.pinned': 'Pinned Tavern message', 'chat.unpinned': 'Unpinned Tavern message',
+  'doodle.erased': 'Erased a doodle', 'doodle.erased_player': "Erased a player's doodles", 'doodle.archived': 'Archived the board doodles',
+  'player.draw_banned': 'Stopped player drawing', 'player.draw_unbanned': 'Allowed player to draw',
 };
 
 const AUDIT_FILTERS = {
@@ -334,9 +336,10 @@ const AUDIT_FILTERS = {
   board: /^(contract|slot|board)\./,
   players: /^(player|reputation)\./,
   tavern: /^chat\.|^player\.(muted|unmuted)$/,
+  doodles: /^doodle\.|^player\.draw_/,
 };
 const AUDIT_FILTER_LABEL: Record<keyof typeof AUDIT_FILTERS, string> = {
-  all: 'Everything', signups: 'Sign-ups', claims: 'Claims', board: 'Board & contracts', players: 'Players & reputation', tavern: 'Tavern',
+  all: 'Everything', signups: 'Sign-ups', claims: 'Claims', board: 'Board & contracts', players: 'Players & reputation', tavern: 'Tavern', doodles: 'Doodles',
 };
 
 export function AuditLog() {

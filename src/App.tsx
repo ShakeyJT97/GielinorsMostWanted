@@ -17,6 +17,7 @@ import AddClaim from './pages/admin/AddClaim';
 import HowItWorksPage from './pages/HowItWorksPage';
 import ResultsPage from './pages/ResultsPage';
 import TavernPage from './pages/TavernPage';
+import GalleryPage from './pages/GalleryPage';
 import BoardControls from './pages/admin/BoardControls';
 import { ContractEditor, ContractsList } from './pages/admin/ContractsAdmin';
 import PlayersAdmin from './pages/admin/PlayersAdmin';
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="how-it-works" element={<HowItWorksPage />} />
           <Route path="results" element={<ResultsPage />} />
           <Route path="tavern" element={<TavernPage />} />
+          <Route path="gallery" element={<GalleryPage />} />
           <Route path="hunters/:name" element={<HunterPage />} />
           <Route path="me" element={<ProfilePage />} />
           <Route path="login" element={<LoginPage />} />
