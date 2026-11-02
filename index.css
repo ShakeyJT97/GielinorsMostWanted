@@ -1,0 +1,281 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --wax-pvm: #8e1f1f;
+  --wax-skilling: #3e6a2d;
+  --wax-special: #3b3778;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.16 0 0 0 0 0.07 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --woodgrain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='120'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004 .18' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.04 0 0 0 0 0.01 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply font-serif text-parchment-100 antialiased;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    background-color: #1f140b;
+    background-image:
+      radial-gradient(ellipse at 50% -10%, rgba(201, 154, 46, .16), transparent 55%),
+      var(--woodgrain),
+      linear-gradient(#2a1a0d, #1a1009);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  :focus-visible { outline: 2px solid #c99a2e; outline-offset: 3px; border-radius: 2px; }
+  ::selection { background: #c99a2e; color: #2a1c11; }
+}
+
+@layer components {
+  /* ---------- the noticeboard ---------- */
+  .board {
+    position: relative;
+    border-radius: 6px;
+    padding: clamp(1.25rem, 3vw, 2.5rem) clamp(.9rem, 3vw, 2.5rem) clamp(2rem, 4vw, 3rem);
+    background-color: #6e4a2a;
+    background-image:
+      var(--woodgrain),
+      repeating-linear-gradient(180deg, transparent 0 118px, rgba(20, 10, 3, .55) 118px 121px, rgba(255, 220, 170, .06) 121px 123px),
+      linear-gradient(90deg, #5d3d21, #7a5330 30%, #6a4626 60%, #7d5531);
+    box-shadow:
+      inset 0 0 0 14px #3e2715,
+      inset 0 0 0 16px #2a190c,
+      inset 0 0 60px 20px rgba(20, 10, 3, .55),
+      0 30px 60px -20px rgba(0, 0, 0, .8);
+  }
+  .board::before, .board::after {
+    content: '';
+    position: absolute;
+    width: 46px; height: 46px;
+    top: 4px;
+    background:
+      radial-gradient(circle at 12px 12px, #8d8a85 0 4px, #2b2a28 5px, transparent 6px),
+      linear-gradient(135deg, #4a4846, #252423);
+    clip-path: polygon(0 0, 100% 0, 100% 30%, 30% 30%, 30% 100%, 0 100%);
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.6));
+  }
+  .board::before { left: 4px; }
+  .board::after { right: 4px; transform: scaleX(-1); }
+
+  .sign {
+    position: relative;
+    margin: 0 auto;
+    width: fit-content;
+    max-width: 100%;
+    padding: .55rem 1.75rem .7rem;
+    background-image: var(--woodgrain), linear-gradient(#4a2f18, #3a240f);
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 220, 170, .12), inset 0 -3px 0 rgba(0, 0, 0, .35), 0 8px 18px rgba(0, 0, 0, .55);
+    text-align: center;
+  }
+  .carved {
+    color: #e8c77a;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 220, 160, .25);
+  }
+
+  .lantern {
+    position: absolute;
+    top: -6px;
+    width: 34px; height: 64px;
+    pointer-events: none;
+  }
+  .lantern .glow {
+    position: absolute; inset: -60px -70px;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 190, 90, .35), transparent 60%);
+    animation: flicker 4.5s ease-in-out infinite;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: .85; } 40% { opacity: 1; } 55% { opacity: .7; } 70% { opacity: .95; }
+  }
+
+  /* ---------- posters ---------- */
+  .poster-wrap {
+    position: relative;
+    transform: rotate(var(--tilt, 0deg));
+    filter: drop-shadow(0 10px 10px rgba(15, 8, 2, .55)) drop-shadow(0 2px 2px rgba(15, 8, 2, .45));
+    transition: transform .25s ease;
+  }
+  .poster-wrap:hover, .poster-wrap:focus-within { transform: rotate(0deg) translateY(-3px); }
+
+  .poster {
+    --stain: .15;
+    --tint: 0;
+    position: relative;
+    color: #2a1c11;
+    background-color: color-mix(in srgb, #efe0bb, #c9a46a calc(var(--tint) * 100%));
+    background-image:
+      radial-gradient(ellipse at 85% 12%, rgba(120, 72, 25, calc(var(--stain) * 1.1)), transparent 38%),
+      radial-gradient(ellipse at 10% 88%, rgba(110, 66, 22, var(--stain)), transparent 42%),
+      radial-gradient(circle at 30% 40%, rgba(130, 80, 30, calc(var(--stain) * .5)), transparent 24%),
+      radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(95, 55, 18, .38) 100%),
+      var(--grain);
+    clip-path: polygon(0 1.2%, 6% 0, 18% .8%, 33% .2%, 51% 1%, 68% 0, 84% .9%, 100% .3%, 99.4% 18%, 100% 37%, 99.2% 58%, 100% 79%, 99.5% 99.2%, 82% 100%, 61% 99.1%, 44% 100%, 27% 99.3%, 9% 100%, 0 99%, .7% 80%, 0 59%, .6% 38%, 0 17%);
+  }
+  .poster[data-wear='1'] { --stain: .22; --tint: .06; }
+  .poster[data-wear='2'] { --stain: .3;  --tint: .12; }
+  .poster[data-wear='3'] { --stain: .42; --tint: .22; }
+  .poster[data-wear='4'] { --stain: .6;  --tint: .36; }
+
+  /* Most Wanted posters: an inked border inside the paper edge */
+  .poster-wanted::before {
+    content: '';
+    position: absolute; inset: 10px;
+    border: 4px double rgba(109, 20, 20, .5);
+    pointer-events: none;
+  }
+
+  /* Paused: a small wooden board hung across the poster on two strings */
+  .paused-sign {
+    position: absolute; z-index: 4; left: 0; right: 0; top: 23%;
+    display: grid; place-items: center; pointer-events: none;
+  }
+  .paused-sign-board {
+    position: relative;
+    padding: .55rem 1.4rem .6rem;
+    text-align: center;
+    background-image: var(--woodgrain), linear-gradient(#5a3a1d, #3e2715);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px rgba(20, 10, 3, .55), inset 0 1px 0 rgba(255, 220, 170, .18), 0 10px 18px rgba(0, 0, 0, .55);
+    transform: rotate(-4deg);
+  }
+  .paused-sign-board::before, .paused-sign-board::after {
+    content: ''; position: absolute; bottom: 100%;
+    width: 2px; height: 46px;
+    background: linear-gradient(#3b2a1a, #6b4c2c);
+  }
+  .paused-sign-board::before { left: 18%; transform: rotate(14deg); transform-origin: bottom; }
+  .paused-sign-board::after { right: 18%; transform: rotate(-14deg); transform-origin: bottom; }
+
+  /* Sealed: a folded notice, with a crease across the middle */
+  .poster-sealed {
+    background-image:
+      linear-gradient(180deg, transparent 49.4%, rgba(70, 40, 12, .22) 50%, rgba(255, 245, 220, .25) 50.6%, transparent 52%),
+      radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(95, 55, 18, .38) 100%),
+      var(--grain);
+  }
+
+  .nail {
+    position: absolute; z-index: 3;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #c9c5bd 0 2px, #6d6a65 3px, #2b2a28 8px);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, .7), 2px 4px 5px rgba(0, 0, 0, .35);
+  }
+
+  .seal {
+    position: relative;
+    display: grid; place-items: center;
+    border-radius: 47% 53% 50% 50% / 52% 48% 52% 48%;
+    background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--wax), #fff 22%), var(--wax) 45%, color-mix(in srgb, var(--wax), #000 35%));
+    box-shadow: 0 2px 3px rgba(0, 0, 0, .45), inset 0 -2px 3px rgba(0, 0, 0, .35);
+    color: color-mix(in srgb, var(--wax), #fff 75%);
+  }
+  .seal::after {
+    content: ''; position: absolute; inset: 14%;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--wax), #fff 35%);
+    opacity: .55;
+  }
+
+  .ribbon {
+    position: absolute; z-index: 2;
+    top: 18px; right: -34px;
+    transform: rotate(38deg);
+    width: 150px;
+    padding: 2px 0;
+    text-align: center;
+    background: #8e1f1f;
+    color: #f6e3c4;
+    box-shadow: 0 2px 4px rgba(0,0,0,.4);
+  }
+
+  .stamp {
+    position: absolute; inset: 0; z-index: 4;
+    display: grid; place-items: center;
+    pointer-events: none;
+  }
+  .stamp > span {
+    display: block;
+    padding: .4rem 1.1rem .55rem;
+    border: 6px double #a11a1a;
+    border-radius: 8px;
+    color: #a11a1a;
+    background: rgba(239, 224, 187, .55);
+    font-family: Rye, Georgia, serif;
+    font-size: clamp(2rem, 5vw, 2.5rem);
+    line-height: 1.05;
+    text-align: center;
+    letter-spacing: .04em;
+    text-shadow: 0 0 1px rgba(161, 26, 26, .6);
+    box-shadow: 0 0 0 2px rgba(161, 26, 26, .25);
+    transform: rotate(-14deg);
+    animation: stamp-in .45s cubic-bezier(.2, 1.4, .4, 1) both;
+  }
+  @keyframes stamp-in {
+    from { transform: rotate(-14deg) scale(2.4); opacity: 0; }
+    70% { opacity: 1; }
+    to { transform: rotate(-14deg) scale(1); opacity: 1; }
+  }
+  .poster-leave { animation: poster-leave .6s ease-in 2.2s both; }
+  @keyframes poster-leave { to { transform: translateY(40px) rotate(8deg); opacity: 0; } }
+  .poster-enter { animation: poster-enter .55s ease-out both; }
+  @keyframes poster-enter { from { transform: translateY(-30px) rotate(-6deg); opacity: 0; } }
+
+  /* ---------- parchment sheets for ordinary pages ---------- */
+  .sheet {
+    position: relative;
+    color: #2a1c11;
+    background-color: #efe0bb;
+    background-image:
+      radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(95, 55, 18, .3) 100%),
+      var(--grain);
+    border-radius: 3px;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, .8);
+  }
+  .sheet a:not(.btn) { @apply underline decoration-ink-soft/50 underline-offset-2 hover:decoration-ink; }
+
+  /* ---------- controls ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2 font-sc font-bold tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-wax { background: #8e1f1f; color: #f6e3c4; box-shadow: inset 0 -2px 0 rgba(0,0,0,.3), 0 2px 4px rgba(0,0,0,.3); }
+  .btn-wax:hover:not(:disabled) { background: #a32626; }
+  .btn-ink { background: #2a1c11; color: #efe0bb; }
+  .btn-ink:hover:not(:disabled) { background: #3e2a1a; }
+  .btn-ghost { @apply border border-ink/30 text-ink hover:bg-ink/5; }
+  .btn-brass { background: #c99a2e; color: #2a1c11; }
+  .btn-brass:hover:not(:disabled) { background: #d9ab3f; }
+  .btn-sm { @apply px-2.5 py-1 text-sm; }
+
+  .field { @apply block w-full rounded border border-ink/30 bg-parchment-50/80 px-3 py-2 text-ink placeholder:text-ink-soft/60 focus:border-ink focus:outline-none focus:ring-2 focus:ring-brass/60; }
+  .label { @apply mb-1 block font-sc font-bold text-ink; }
+  .hint { @apply mt-1 text-sm text-ink-soft; }
+
+  .chip { @apply inline-flex items-center rounded-full px-2 py-0.5 font-sc text-sm font-bold; }
+  .chip-pvm { background: rgba(142, 31, 31, .14); color: #7a1a1a; }
+  .chip-skilling { background: rgba(62, 106, 45, .16); color: #2f5222; }
+  .chip-special { background: rgba(59, 55, 120, .15); color: #2f2c63; }
+
+  .table-ink { @apply w-full border-collapse text-left; }
+  .table-ink th { @apply border-b-2 border-ink/40 px-2 py-2 font-sc font-bold text-ink; }
+  .table-ink td { @apply border-b border-ink/15 px-2 py-2 align-top; }
+}
+
+
+/* Category colours, matching the wax seals. Kept outside @layer so Tailwind doesn't strip
+   these: the class names are built at runtime (cat-box-${category}). */
+.cat-box { color: var(--cat); border-color: color-mix(in srgb, var(--cat) 75%, transparent);
+           background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--cat) 22%, transparent), color-mix(in srgb, var(--cat) 10%, transparent) 75%); }
+.cat-box-pvm, .cat-text-pvm { --cat: #8e1f1f; }
+.cat-box-skilling, .cat-text-skilling { --cat: #3e6a2d; }
+.cat-box-special, .cat-text-special { --cat: #3b3778; }
+.cat-text-pvm, .cat-text-skilling, .cat-text-special { color: var(--cat); }
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
+}
+
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
